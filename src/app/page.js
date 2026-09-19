@@ -32,6 +32,7 @@ export default function Home() {
     }
     return closestColor;
   };
+
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -67,7 +68,33 @@ export default function Home() {
     }
   }
 
-  
+  const bayer4x4 = (data, width, height, pallete) => {
+    const bayer4x4 = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ]
+
+    for(let y = 0; y < height; y++){
+      for (let x = 0; x < width; x++) {
+        let index = (y * width + x) * 4;
+
+        const matrix = bayer4x4[y % 4][y % 4];
+        const num = (matrix / 16 - 0.5) * 64;
+
+        let r = Math.min(255, Math.max(0, data[index] + num))
+        let g = Math.min(255, Math.max(0, data[index + 1] + num))
+        let b = Math.min(255, Math.max(0, data[index + 2] + num))
+        
+        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
+
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
+      }
+    }
+  };
   const drawCanvas = (img, algorithm) => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -86,6 +113,8 @@ export default function Home() {
 
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, pallete);
+    } else if (algorithm == "Bayer 4x4"){
+      bayer4x4(data, width, height, pallete);
     }
     ctx.putImageData(imageData, 0, 0);
   }
