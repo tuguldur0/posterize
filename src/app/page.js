@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Floyd-Steinberg");
-  const algorithms = ["Bayer 4x4", "Floyd-Steinberg"];
-
+  // ene deer original nemsen
+  const algorithms = ["Bayer 4x4", "Floyd-Steinberg", "Original"];
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
 
@@ -122,6 +122,13 @@ export default function Home() {
     link.href = canvas.toDataURL("image/png");
     link.click();
   }
+  // reset buttonii function
+ const handleReset = () => {
+  setAlgorithmSelected("Original");
+  if(loadedImgRef.current) {
+    drawCanvas(loadedImgRef.current, "Original");
+  }
+ }
   return (
     <div>
       <h1>Posterize</h1>
@@ -145,8 +152,10 @@ export default function Home() {
       <div>
         <canvas ref={canvasRef}></canvas>
       </div>
-
-      {imageSrc && <button onClick={handleExport}>export</button>}
+    <div>
+    {imageSrc && <button onClick={handleExport}>export</button>}
+    {imageSrc && <button onClick={handleReset}>Reset</button>}
+    </div>
     </div>
   )
 }
