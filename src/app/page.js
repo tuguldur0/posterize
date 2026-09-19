@@ -6,15 +6,12 @@ export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Floyd-Steinberg");
   const [paletteSelected, setPaletteSelected] = useState("Green");
+  const [scanlineInterval, setScanlineInterval] = useState(2);
+  const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Original"];
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
-  const [effects, setEffects] = useState({
-    scanlines: false,
-    chromaticAberration: false,
-    noise: false,
-  })
   const palettes = {
     "Green": [
       [15, 56, 15],
@@ -29,10 +26,10 @@ export default function Home() {
       [235, 235, 235],
     ],
     "Neon": [
-      [13, 2, 33],
-      [121, 26, 204],
-      [255, 56, 100],
-      [45, 226 , 230],
+      [5, 0, 15],
+      [255, 0, 255],
+      [0, 255, 255],
+      [255, 255 , 255],
     ],
     "Brown": [
       [68, 36, 12],
@@ -45,6 +42,12 @@ export default function Home() {
       [115, 0, 0],
       [225, 0, 0],
       [255, 140, 140],
+    ],
+    "Blue": [
+      [0, 0, 15],
+      [0,0, 115],
+      [0, 0, 225],
+      [140, 140, 255],
     ]
 
   };
@@ -65,7 +68,6 @@ export default function Home() {
     return closestColor;
   };
 
-//algorithms
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -100,7 +102,6 @@ export default function Home() {
       }
     }
   }
-
   const bayer4x4 = (data, width, height, pallete) => {
     const bayer4x4 = [
       [0, 8, 2, 10],
@@ -155,8 +156,7 @@ export default function Home() {
         let errR = oldR - newR;
         let errG = oldG - newG;
         let errB = oldB - newB;
-
-        
+  
         calculateError(x+1, y, errR, errG, errB, 1/8);
         calculateError(x+2, y, errR, errG, errB, 1/8);
         calculateError(x-1, y+1, errR, errG, errB, 1/8);
@@ -166,10 +166,9 @@ export default function Home() {
       }
     }
   }
-//effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
     for(let y = 0; y < height; y++){
-      if(y % interval === 0) {
+      if(y % interval) {
         for(let x=0; x <width; x++ ){
           let index = (y * width + x) * 4;
           data[index] *= darkness; 
@@ -179,34 +178,7 @@ export default function Home() {
       }
     }
   }
-  const chromaticAberration = (height, width, data, movement = 4) => {
-    const original = new Uint8ClampedArray(data);
-
-    const getIndex = (x, y) => (y * width + x) * 4;
-    const clampX = (x) => Math.min(width-1, Math.max(0,x));
-
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
-        const outIndex = getIndex(x, y);
-
-        const rX = clampX(x + movement);
-        const rIndex = getIndex(rX, y);
-
-        const bX = clampX(x - movement);
-        const bIndex = getIndex(bX, y);
-
-        const gIndex = outIndex;
-
-        data[outIndex] = original[rIndex];
-        data[outIndex + 1] = original[gIndex + 1];
-        data[outIndex + 2] = original[bIndex + 2];
-      }
-    }
-  }
-  const noiseDither = (height, width, data) => {
-
-  }
-  const drawCanvas = (img, algorithm, selectedPalette) => {
+  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness)  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -221,20 +193,20 @@ export default function Home() {
     const activePalette = palettes[selectedPalette];
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
+      scanlines(height, width, data);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson"){
       atkinson(data, width, height, activePalette);
     }
-    if(effects.scanlines) scanlines(height, width, data);
-    if(effects.chromaticAberration) chromaticAberration(height, width, data);
-    if(effects.noise) noiseDither(height, width, data);
+    if (algorithm !== "Original") {
+      scanlines(height, width , data, interval, darkness);
+    }
     ctx.putImageData(imageData, 0, 0);
   }
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if(!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -305,6 +277,29 @@ export default function Home() {
             ))}
           </select>
         </label> 
+      </div>
+      <div>
+        <label>
+          ScanLine Gap: {scanlineInterval}
+          <input type="range" min="1" max="10" step="1" value={scanlineInterval} onChange={(e) => {
+            setScanlineInterval(Number(e.target.value));
+          }} onMouseUp={(e) => {
+            const val = Number(e.target.value);
+            if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, val, scanlineDarkness);
+          }}/>
+        </label>
+      </div>
+      <div>
+        <label>
+          Scanline Darkness: {scanlineDarkness} 
+          <input type="range" min="0" max="1" step="0.1" value={scanlineDarkness} onChange={(e) => {
+            setScanlineDarkness(Number(e.target.value));
+          }} onMouseUp={(e) => {
+            const val = Number(e.target.value);
+            if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, val);
+
+          }} />
+        </label>
       </div>
       <div>
         <canvas ref={canvasRef}></canvas>
