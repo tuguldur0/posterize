@@ -80,7 +80,7 @@ export default function Home() {
       for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
 
-        const matrix = bayer4x4[y % 4][y % 4];
+        const matrix = bayer4x4[y % 4][x % 4];
         const num = (matrix / 16 - 0.5) * 64;
 
         let r = Math.min(255, Math.max(0, data[index] + num))
@@ -123,11 +123,6 @@ export default function Home() {
         let errG = oldG - newG;
         let errB = oldB - newB;
         
-        // calculateError(x+1, y, errR, errG, errB, 7/16);
-        // calculateError(x-1, y+1, errR, errG, errB, 3/16);
-        // calculateError(x, y+1, errR, errG, errB, 5/16);
-        // calculateError(x+1, y+1, errR, errG, errB, 1/16);
-
         calculateError(x+1, y, errR, errG, errB, 1/8);
         calculateError(x+2, y, errR, errG, errB, 1/8);
         calculateError(x-1, y+1, errR, errG, errB, 1/8);
@@ -135,6 +130,19 @@ export default function Home() {
         calculateError(x+1, y+1, errR, errG, errB, 1/8);
         calculateError(x, y+2, errR, errG, errB, 1/8);
 
+      }
+    }
+  }
+
+  const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
+    for(let y = 0; y < height; y++){
+      if(y % interval) {
+        for(let x=0; x <width; x++ ){
+          let index = (y * width + x) * 4;
+          data[index] *= darkness; 
+          data[index + 1] *= darkness; // g
+          data[index + 2] *= darkness; // b
+        }
       }
     }
   }
@@ -157,6 +165,7 @@ export default function Home() {
 
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, pallete);
+      scanlines(height, width, data);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, pallete);
     } else if (algorithm == "Atkinson"){
