@@ -123,7 +123,7 @@ export default function Home() {
     link.click();
   }
   return (
-    <div>
+    <div className={algorithmSelected === "Floyd-Steinberg" ? `bg-[#8BAC0F]` : `bg-amber-700`}>
       <h1>Posterize</h1>
 
       <div>
