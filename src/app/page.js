@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Floyd-Steinberg");
+  const [paletteSelected, setPaletteSelected] = useState("Green");
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Original"];
   const canvasRef = useRef(null);
@@ -14,12 +15,39 @@ export default function Home() {
     chromaticAberration: false,
     noise: false,
   })
-  const pallete = [
-    [15, 56, 15],
-    [48, 98, 48],
-    [139, 172, 15],
-    [155, 188, 15],
-  ]
+  const palettes = {
+    "Green": [
+      [15, 56, 15],
+      [48, 98, 48],
+      [139, 172, 15],
+      [155, 188, 15],
+    ],
+    "Gray": [
+      [25, 25, 25],
+      [105, 105, 105],
+      [175, 175, 175],
+      [235, 235, 235],
+    ],
+    "Neon": [
+      [13, 2, 33],
+      [121, 26, 204],
+      [255, 56, 100],
+      [45, 226 , 230],
+    ],
+    "Brown": [
+      [68, 36, 12],
+      [137, 90, 48],
+      [202, 156, 110],
+      [242, 223, 198],
+    ],
+    "Red": [
+      [15, 0, 0],
+      [115, 0, 0],
+      [225, 0, 0],
+      [255, 140, 140],
+    ]
+
+  };
 
   const findClosestColor = (r, g, b, pallete) => {
     let minDistance = Infinity;
@@ -127,6 +155,7 @@ export default function Home() {
         let errR = oldR - newR;
         let errG = oldG - newG;
         let errB = oldB - newB;
+
         
         calculateError(x+1, y, errR, errG, errB, 1/8);
         calculateError(x+2, y, errR, errG, errB, 1/8);
@@ -134,14 +163,13 @@ export default function Home() {
         calculateError(x, y+1, errR, errG, errB, 1/8);
         calculateError(x+1, y+1, errR, errG, errB, 1/8);
         calculateError(x, y+2, errR, errG, errB, 1/8);
-
       }
     }
   }
 //effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
     for(let y = 0; y < height; y++){
-      if(y % interval) {
+      if(y % interval === 0) {
         for(let x=0; x <width; x++ ){
           let index = (y * width + x) * 4;
           data[index] *= darkness; 
@@ -171,44 +199,38 @@ export default function Home() {
 
         data[outIndex] = original[rIndex];
         data[outIndex + 1] = original[gIndex + 1];
-        data[outIndex + 2] = original[gIndex + 2];
+        data[outIndex + 2] = original[bIndex + 2];
       }
     }
   }
   const noiseDither = (height, width, data) => {
 
   }
-  const drawCanvas = (img, algorithm) => {
+  const drawCanvas = (img, algorithm, selectedPalette) => {
     const canvas = canvasRef.current;
     if(!canvas) return;
-
     const ctx = canvas.getContext("2d");
     let width = img.width;
     let height = img.height;
     canvas.width = width;
     canvas.height = height;
-
     ctx.drawImage(img, 0, 0);
-
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     console.log(data); //look
-
+    const activePalette = palettes[selectedPalette];
     if(algorithm == "Floyd-Steinberg"){
-      floydsteinberg(data, width, height, pallete);
-      chromaticAberration(height, width, data);
-    if(effects.noise) noiseDither(height, width, data);
+      floydsteinberg(data, width, height, activePalette);
     } else if (algorithm == "Bayer 4x4"){
-      bayer4x4(data, width, height, pallete);
+      bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson"){
-      atkinson(data, width, height, pallete);
+      atkinson(data, width, height, activePalette);
     }
     if(effects.scanlines) scanlines(height, width, data);
     if(effects.chromaticAberration) chromaticAberration(height, width, data);
     if(effects.noise) noiseDither(height, width, data);
     ctx.putImageData(imageData, 0, 0);
   }
-
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if(!file) return;
@@ -218,7 +240,7 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected);
+        drawCanvas(img, algorithmSelected, paletteSelected);
         setImageSrc(e.target.result);
       }
       img.src = e.target.result;
@@ -229,13 +251,20 @@ export default function Home() {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if(loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, value);
+      drawCanvas(loadedImgRef.current, value, paletteSelected);
+    }
+  }
+  // unguu solidog function
+  const handlePaletteChange = (event) => {
+    const value = event.target.value;
+    setPaletteSelected(value);
+    if (loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, value);
     }
   }
   const handleExport = () => {
     const canvas = canvasRef.current;
     if(!canvas) return;
-
     const link = document.createElement("a");
     link.download = "export.png";
     link.href = canvas.toDataURL("image/png");
@@ -245,13 +274,12 @@ export default function Home() {
  const handleReset = () => {
   setAlgorithmSelected("Original");
   if(loadedImgRef.current) {
-    drawCanvas(loadedImgRef.current, "Original");
+    drawCanvas(loadedImgRef.current, "Original", paletteSelected);
   }
  }
   return (
     <div>
       <h1>Posterize</h1>
-
       <div>
         <label>
           Select image:{" "}
@@ -267,6 +295,16 @@ export default function Home() {
             ))}
           </select>
         </label>
+      </div>
+      <div>
+        <label>
+          Palette:{" "}
+          <select value={paletteSelected} onChange={handlePaletteChange}>
+            {Object.keys(palettes).map((key, index) =>(
+              <option value={key} key={index}>{key}</option>
+            ))}
+          </select>
+        </label> 
       </div>
       <div>
         <canvas ref={canvasRef}></canvas>
