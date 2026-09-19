@@ -36,10 +36,10 @@ export default function Home() {
       [242, 223, 198],
     ],
     "Red": [
-      [42, 24, 38],
-      [117, 36, 56],
-      [209, 67, 52],
-      [255,166, 92],
+      [15, 0, 0],
+      [115, 0, 0],
+      [225, 0, 0],
+      [255, 140, 140],
     ]
 
   };
@@ -107,7 +107,7 @@ export default function Home() {
       for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
 
-        const matrix = bayer4x4[y % 4][y % 4];
+        const matrix = bayer4x4[y % 4][x % 4];
         const num = (matrix / 16 - 0.5) * 64;
 
         let r = Math.min(255, Math.max(0, data[index] + num))
@@ -149,11 +149,8 @@ export default function Home() {
         let errR = oldR - newR;
         let errG = oldG - newG;
         let errB = oldB - newB;
-      
-        // calculateError(x+1, y, errR, errG, errB, 7/16);
-        // calculateError(x-1, y+1, errR, errG, errB, 3/16);
-        // calculateError(x, y+1, errR, errG, errB, 5/16);
-        // calculateError(x+1, y+1, errR, errG, errB, 1/16);
+
+        
         calculateError(x+1, y, errR, errG, errB, 1/8);
         calculateError(x+2, y, errR, errG, errB, 1/8);
         calculateError(x-1, y+1, errR, errG, errB, 1/8);
@@ -163,6 +160,19 @@ export default function Home() {
       }
     }
   }
+  const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
+    for(let y = 0; y < height; y++){
+      if(y % interval) {
+        for(let x=0; x <width; x++ ){
+          let index = (y * width + x) * 4;
+          data[index] *= darkness; 
+          data[index + 1] *= darkness; // g
+          data[index + 2] *= darkness; // b
+        }
+      }
+    }
+  }
+
   const drawCanvas = (img, algorithm, selectedPalette) => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -178,6 +188,7 @@ export default function Home() {
     const activePalette = palettes[selectedPalette];
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
+      scanlines(height, width, data);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson"){
@@ -188,7 +199,7 @@ export default function Home() {
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if(!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
