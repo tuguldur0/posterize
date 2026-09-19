@@ -9,7 +9,11 @@ export default function Home() {
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Original"];
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
-
+  const [effects, setEffects] = useState({
+    scanlines: false,
+    chromaticAberration: false,
+    noise: false,
+  })
   const pallete = [
     [15, 56, 15],
     [48, 98, 48],
@@ -33,6 +37,7 @@ export default function Home() {
     return closestColor;
   };
 
+//algorithms
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -133,7 +138,7 @@ export default function Home() {
       }
     }
   }
-
+//effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
     for(let y = 0; y < height; y++){
       if(y % interval) {
@@ -146,7 +151,33 @@ export default function Home() {
       }
     }
   }
+  const chromaticAberration = (height, width, data, movement = 4) => {
+    const original = new Uint8ClampedArray(data);
 
+    const getIndex = (x, y) => (y * width + x) * 4;
+    const clampX = (x) => Math.min(width-1, Math.max(0,x));
+
+    for(let y = 0; y < height; y++){
+      for(let x = 0; x < width; x++){
+        const outIndex = getIndex(x, y);
+
+        const rX = clampX(x + movement);
+        const rIndex = getIndex(rX, y);
+
+        const bX = clampX(x - movement);
+        const bIndex = getIndex(bX, y);
+
+        const gIndex = outIndex;
+
+        data[outIndex] = original[rIndex];
+        data[outIndex + 1] = original[gIndex + 1];
+        data[outIndex + 2] = original[gIndex + 2];
+      }
+    }
+  }
+  const noiseDither = (height, width, data) => {
+
+  }
   const drawCanvas = (img, algorithm) => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -165,12 +196,16 @@ export default function Home() {
 
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, pallete);
-      scanlines(height, width, data);
+      chromaticAberration(height, width, data);
+    if(effects.noise) noiseDither(height, width, data);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, pallete);
     } else if (algorithm == "Atkinson"){
       atkinson(data, width, height, pallete);
     }
+    if(effects.scanlines) scanlines(height, width, data);
+    if(effects.chromaticAberration) chromaticAberration(height, width, data);
+    if(effects.noise) noiseDither(height, width, data);
     ctx.putImageData(imageData, 0, 0);
   }
 
