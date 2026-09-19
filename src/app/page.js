@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Floyd-Steinberg");
-  const algorithms = ["Bayer 4x4", "Floyd-Steinberg"];
+  const algorithms = ["Bayer 4x4", "Floyd-Steinberg", "Atkinson"];
 
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
@@ -95,6 +95,50 @@ export default function Home() {
       }
     }
   };
+
+  const atkinson = (data, width, height, pallete) => {
+    const calculateError = (nx, ny, errR, errG, errB, factor) => {
+      if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
+        let nIdx = (ny * width + nx) * 4;
+        data[nIdx] += errR *factor
+        data[nIdx + 1] += errG * factor;
+        data[nIdx + 2] += errB * factor;
+      }
+    }
+    for(let y = 0; y < height; y++){
+      for(let x = 0; x < width; x++){
+        let index = (y * width + x) * 4;
+        
+        let oldR = data[index];
+        let oldG = data[index + 1];
+        let oldB = data[index + 2];
+        
+        const [newR, newG, newB] = findClosestColor(oldR, oldG, oldB, pallete);
+
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
+
+        let errR = oldR - newR;
+        let errG = oldG - newG;
+        let errB = oldB - newB;
+        
+        // calculateError(x+1, y, errR, errG, errB, 7/16);
+        // calculateError(x-1, y+1, errR, errG, errB, 3/16);
+        // calculateError(x, y+1, errR, errG, errB, 5/16);
+        // calculateError(x+1, y+1, errR, errG, errB, 1/16);
+
+        calculateError(x+1, y, errR, errG, errB, 1/8);
+        calculateError(x+2, y, errR, errG, errB, 1/8);
+        calculateError(x-1, y+1, errR, errG, errB, 1/8);
+        calculateError(x, y+1, errR, errG, errB, 1/8);
+        calculateError(x+1, y+1, errR, errG, errB, 1/8);
+        calculateError(x, y+2, errR, errG, errB, 1/8);
+
+      }
+    }
+  }
+
   const drawCanvas = (img, algorithm) => {
     const canvas = canvasRef.current;
     if(!canvas) return;
@@ -115,6 +159,8 @@ export default function Home() {
       floydsteinberg(data, width, height, pallete);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, pallete);
+    } else if (algorithm == "Atkinson"){
+      atkinson(data, width, height, pallete);
     }
     ctx.putImageData(imageData, 0, 0);
   }
