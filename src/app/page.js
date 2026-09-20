@@ -359,9 +359,15 @@ export default function Home() {
     const ctx = canvas.getContext("2d");
     let width = img.width;
     let height = img.height;
+    const MAX_Size = 1200;
+    if(width > MAX_Size || height > MAX_Size / height) {
+      const ratio = Math.min(MAX_Size / width, MAX_Size)
+      width = Math.floor(width*ratio);
+      height = Math.floor(height * ratio);
+    }
     canvas.width = width;
     canvas.height = height;
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, width, height);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     const activePalette = palettes[selectedPalette];
@@ -456,6 +462,7 @@ export default function Home() {
       drawCanvas(loadedImgRef.current, "Original", paletteSelected);
     }
   };
+
   return (
     <div
       className={`${dependentBackground} ${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
