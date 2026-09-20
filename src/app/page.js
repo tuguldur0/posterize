@@ -274,8 +274,6 @@ export default function Home() {
       }
     }
   };
-<<<<<<< HEAD
-=======
   const bayer8x8 = (data, width, height, pallete) => {
     const matrix8x8 = [
       [0, 48, 12, 60, 3, 51, 15, 63],
@@ -287,21 +285,21 @@ export default function Home() {
       [10, 58, 6, 54, 9, 57, 5, 53],
       [42, 26, 38, 22, 41, 25, 37, 21],
     ];
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
-        const matrix = matrix8x8[y%8][x%8];
-        const bias = (matrix/64 -0.5) * 64;
+        const matrix = matrix8x8[y % 8][x % 8];
+        const bias = (matrix / 64 - 0.5) * 64;
         let r = Math.min(255, Math.max(0, data[index] + bias));
-        let g = Math.min(255, Math.max(0, data[index + 1] + bias))
+        let g = Math.min(255, Math.max(0, data[index + 1] + bias));
         let b = Math.min(255, Math.max(0, data[index + 2] + bias));
         const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
-        data[index] = newR; data[index + 1] = newG; data[index+2] = newB;
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
       }
     }
-  }
-
->>>>>>> abeb501c8b26ddfc808f1b7999b613b9eb5724f7
+  };
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
