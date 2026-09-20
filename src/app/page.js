@@ -5,17 +5,16 @@ export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Original");
   const [paletteSelected, setPaletteSelected] = useState("Green");
-  const [dependentBackground, setDependentBackground] =
-    useState("bg-[#DCE4F3]");
-  const [dependentTextColor, setDependentTextColor] =
-    useState("text-[#0F380F]");
+  const [dependentBackground, setDependentBackground] = useState("bg-[#DCE4F3]");
+  const [dependentTextColor, setDependentTextColor] = useState("text-[#0F380F]");
   const [scanlineInterval, setScanlineInterval] = useState(2);
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
+  const [customColors, setCustomColors] = useState(["#000000", "#ffffff"]);
+  // ene deer original nemsen
+  const [isDragging, setIsDragging] = useState(false);
   const [isDefault, setIsDefault] = useState(false);
-  const [dependentAccentColor, setDependentAccentColor] =
-    useState("accent-[#0F380F]");
-  const [swappedBackground, setSwappedBackground] =
-    useState("hover:bg-[#0F380F]");
+  const [dependentAccentColor, setDependentAccentColor] = useState("accent-[#0F380F]");
+  const [swappedBackground, setSwappedBackground] = useState("hover:bg-[#0F380F]");
   const [swappedTextColor, setSwappedTextColor] = useState(
     "hover:text-[#DCE4F3]",
   );
@@ -82,6 +81,31 @@ export default function Home() {
       [140, 140, 255],
     ],
   };
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+  };
+  const handleCustomColorChange = (index, value) => {
+    const newColors = [...customColors];
+    newColors[index] = value;
+    setCustomColors(newColors);
+    if (paletteSelected === "Custom" && loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, "Custom", scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, newColors);
+    }
+  };
+  const addCustomColor = () => {
+    setCustomColors([...customColors, "#ffffff"]);
+  };
+  const removeCustomColor = (index) => {
+    if (customColors.length <= 2 ) return;
+    const newColors = customColors.filter((_, i) => i !== index);
+    setCustomColors(newColors);
+    if (paletteSelected === "Custom" && loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, "Custom", scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude,  newColors);
+    }
+  };
 
   //before and after toggle
   const handleDefault = () => {
@@ -94,7 +118,6 @@ export default function Home() {
       drawCanvas(loadedImgRef.current, "Original");
       setIsDefault(true);
     }
-    console.log(isDefault);
   };
 
   //dependent backgroundcolor
@@ -251,6 +274,8 @@ export default function Home() {
       }
     }
   };
+<<<<<<< HEAD
+=======
   const bayer8x8 = (data, width, height, pallete) => {
     const matrix8x8 = [
       [0, 48, 12, 60, 3, 51, 15, 63],
@@ -276,6 +301,7 @@ export default function Home() {
     }
   }
 
+>>>>>>> abeb501c8b26ddfc808f1b7999b613b9eb5724f7
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -379,7 +405,7 @@ export default function Home() {
         }
       }
     }
-  };
+  }
   const chromaticAberration = (height, width, data, movement = 4) => {
     const original = new Uint8ClampedArray(data);
 
@@ -473,6 +499,7 @@ export default function Home() {
     activeEffects = effects,
     movement = chromaticSlider,
     amplitude = noiseAmplitude,
+    currentCustomColors = customColors,
     brightnessVal = brightness,
     contrastVal = contrast,
     gammaVal = gamma, 
@@ -495,11 +522,12 @@ export default function Home() {
     ctx.drawImage(img, 0, 0, width, height);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    const activePalette = palettes[selectedPalette];
+    const activePalette = selectedPalette === "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
     if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
     adjustColor(data, brightnessVal, contrastVal, gammaVal);
     posterizeLevels(data, levels)
     if (activeEffects.invert) invert(data);
+
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
     } else if (algorithm == "Bayer 4x4") {
@@ -516,8 +544,9 @@ export default function Home() {
     if (activeEffects.scanlines) {
       scanlines(height, width, data, interval, darkness);
     }
-    if (activeEffects.chromaticAberration)
+    if (activeEffects.chromaticAberration) {
       chromaticAberration(height, width, data, movement);
+    }
     ctx.putImageData(imageData, 0, 0);
   };
   const handleImageUpload = (event) => {
@@ -536,14 +565,36 @@ export default function Home() {
           scanlineDarkness,
           effects,
           chromaticSlider,
+          noiseAmplitude
         );
         setImageSrc(e.target.result);
       };
       img.src = e.target.result;
-    };
+    }
+    reader.readAsDataURL(file)
+  }
+  
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file =e.dataTransfer.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        loadedImgRef.current = img;
+        drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude);
+        setImageSrc(event.target.result);
+      }
+      img.src = event.target.result;
+    }
     reader.readAsDataURL(file);
-  };
-  const handleAlgorithmChange = (event) => {
+  }
+    const handleAlgorithmChange = (event) => {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if (loadedImgRef.current) {
@@ -554,6 +605,8 @@ export default function Home() {
         scanlineInterval,
         scanlineDarkness,
         effects,
+        chromaticSlider,
+        noiseAmplitude
       );
     }
   };
@@ -576,6 +629,8 @@ export default function Home() {
         scanlineInterval,
         scanlineDarkness,
         updated,
+        chromaticSlider,
+        noiseAmplitude
       );
     }
   };
@@ -639,38 +694,53 @@ export default function Home() {
 
   return (
     <div
-      className={`${dependentBackground} ${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
-    >
-      <div>
-        <h1 className="font-mono font-bold text-5xl p-10">Posterizer</h1>
+     onDragEnter={(e) => {e.preventDefault(); e.stopPropagation(); setIsDragging(true);}}
+     onDragOver={(e) => {e.preventDefault(); e.stopPropagation(); }}
+     onDrop={handleDrop} 
+     className={` relative ${dependentBackground} ${dependentTextColor} w-screen min-h-screen p-5 transition-all duration-100 ${isDragging ? "bg-slate-200" : ""}`} style={{ minHeight: "100vh"}}>
+      {isDragging && (
+      <div 
+      onDragLeave={(e) => {e.preventDefault(); e.stopPropagation(); setIsDragging(false)}} 
+      onDragOver={(e) => {e.preventDefault(); e.stopPropagation(); }} 
+      onDrop={handleDrop} 
+      className="absolute inset-0 z-50 flex items-center justify-center border-4 border-dashed border-gray-400 bg-gray-100 bg-opacity-75 top-0 letf-0 w-full h-full">
+        <div className="p-20 border-8 border-green-500 border-dashed rounded-lg pointer-events-none">
+        <h2 className="text-4xl font-bold text-green-600">Drop Image Here!</h2>
+          </div>
       </div>
-      <div className="p-10">
-        <div className={`bg-gray-400 w-5xl m-5 box-border`}>
-          <canvas className="w-5xl" ref={canvasRef}></canvas>
+      )}
+      <div className="flex flex-col h-full pr-[450px]">
+        <div className="p-8">
+           <h1 className="p-10 font-bold text-5xl">Posterize</h1>
         </div>
-        <div className=" flex border-4 pt-5 flex-col p-5 gap-2.5 text-2xl justify-between w-3xl fixed right-0 top-0 h-screen">
+      <div className="p-8 flex items-center justify-center p-8 flex-1">
+      <div className="bg-gray-400 p-2 shadow-lg inline-block box-border">
+        <canvas className="block max-w-full h-auto" ref={canvasRef}></canvas>
+        </div>
+        </div>
+        </div>
+        <div className="flex overflow-y-auto border-l-4 pt-5 flex-col p-5 gap-4 text-xl justify-between w-[420px] fixed right-0 top-0 h-screen bg-inherit shadow-2xl z-40">
           <div className="flex flex-col gap-5">
             <div>
               <label className="flex flex-col gap-2">
                 Image{" "}
-                <input
-                  className={`border-2 hover:cursor-pointer hover:opacity-80`}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
+                <input 
+                className={`border-2 p-1 hover:cursor-pointer hover:opacity-80`} 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageUpload}
                 />
               </label>
             </div>
             <div>
               <label className="flex flex-col gap-2">
-                Algorithm:{" "}
-                <select
-                  className={` border-2 hover:cursor-pointer hover:opacity-80 ${dependentBackground} ${dependentTextColor}`}
-                  value={algorithmSelected}
-                  onChange={handleAlgorithmChange}
-                >
-                  {algorithms.map((option, index) => (
-                    <option value={option} key={index}>
+                Algorithm:{" "} 
+                <select 
+                className={` border-2 hover:cursor-pointer hover:opacity-80 ${dependentBackground} ${dependentTextColor}`} 
+                value={algorithmSelected} 
+                onChange={handleAlgorithmChange}>
+                  {algorithms.map((option, index) => 
+                    (<option value={option} key={index}>
                       {option}
                     </option>
                   ))}
@@ -681,55 +751,113 @@ export default function Home() {
               {algorithmSelected != "Original" && (
                 <label className="flex flex-col gap-2">
                   Palette:{" "}
-                  <select
-                    className={`${dependentBackground} ${dependentTextColor} hover:cursor-pointer hover:opacity-80 border-2`}
+                  <select 
+                    className={`${dependentBackground} ${dependentTextColor} p-1 hover:cursor-pointer hover:opacity-80 border-2`}
                     value={paletteSelected}
-                    onChange={handlePaletteChange}
-                  >
+                    onChange={handlePaletteChange}>
                     {Object.keys(palettes).map((key, index) => (
-                      <option className="border-8" value={key} key={index}>
-                        {key}
-                      </option>
+                      <option className="border-8" value={key} key={index}>{key}</option>
                     ))}
+                    <option className="border-8" value="Custom">Custom</option>
                   </select>
                 </label>
               )}
             </div>
-          </div>
-          <div className="flex gap-3 p-3 justify-between items-center flex-wrap">
-            <div>
-              <label className="flex gap-2 items-center">
-                <input
-                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
-                  type="checkbox"
-                  checked={effects.scanlines}
-                  onChange={() => handleEffectToggle("scanlines")}
-                />
-                Scanlines
-              </label>
+            {paletteSelected === "Custom" && algorithmSelected != "Original" && (
+              <div className="flex flex-col gap-2 items-center my-2">
+          <span className="font-semibold">Custom Colors: </span>
+          <div className="flex flex-wrap items-center gap-3">
+          {customColors.map((color, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <input type="color" value={color} onChange={(e) => handleCustomColorChange(index, e.target.value)} className="w-8 h-8 p-0 border-0 rounded cursor-pointer"/>
+              {customColors.length > 2 && (
+                <button onClick={() => removeCustomColor(index)} className="text-red-500 hover:text-red-700 font-bold px-1"
+                title="Remove Color">x</button>
+              )}
             </div>
-            <div>
-              <label className="flex gap-2 items-center">
-                <input
-                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
-                  type="checkbox"
-                  checked={effects.chromaticAberration}
-                  onChange={() => handleEffectToggle("chromaticAberration")}
-                />
-                Chromatic Aberration
-              </label>
-            </div>
-            <div>
-              <label className="flex gap-2 items-center">
-                <input
-                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
-                  type="checkbox"
-                  checked={effects.invert}
-                  onChange={() => handleEffectToggle("invert")}
-                />
-                Invert
-              </label>
-            </div>
+          ))}
+          <button onClick={addCustomColor} className="px-3 py-1 text-sm text-black bg-gray-100 border border-gray-300 rounded shadow-sm hover:bg-gray-200 ">Add Color</button>
+        </div>
+        </div>
+      )}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 text-lg">
+        <div>
+          <label className="flex items-center gap-2">
+            <input 
+            className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5 `}
+            type="checkbox" 
+            checked={effects.scanlines} 
+            onChange={() => handleEffectToggle("scanlines")}/>
+            Scanlines
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center gap-2">
+            <input 
+            className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`} 
+            type="checkbox" checked={effects.chromaticAberration}
+            onChange={() => handleEffectToggle("chromaticAberration")}/>
+            Chromatic
+          </label>
+        </div>
+        <div>
+          <label className="flex items-center gap-2">
+            <input 
+            className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`} 
+            type="checkbox" 
+            checked={effects.invert} 
+            onChange={() => handleEffectToggle("invert")}/>
+            Invert
+          </label>
+        </div>
+        </div>
+        <div className="text-lg">
+          <label className="flex flex-col">
+            Scanline Gap: {scanlineInterval}
+            <input 
+            className={`${dependentAccentColor}`} 
+            type="range" min="1" max="15" step="0.5" 
+            value={scanlineInterval}
+             onChange={(e) => {
+              setScanlineInterval(Number(e.target.value));
+            }}
+          onMouseUp={(e) => {
+            const val = Number(e.target.value);
+            if (loadedImgRef.current)
+              drawCanvas(
+               loadedImgRef.current,
+               algorithmSelected,
+               paletteSelected,
+               val,
+               scanlineDarkness,
+               effects,
+               chromaticSlider,
+               noiseAmplitude
+              );
+          }}/>
+          </label>
+        </div>
+        <div className="text-lg">
+          <label className="flex flex-col">
+            Scanline Darkness: {scanlineDarkness}
+            <input className={`${dependentAccentColor}`} type="range" min="0" max="1" step="0.1" value={scanlineDarkness} onChange={(e) => {
+              setScanlineDarkness(Number(e.target.value));
+            }} 
+            onMouseUp={(e) => {
+              const val = Number(e.target.value);
+              if (loadedImgRef.current)
+                drawCanvas(
+                 loadedImgRef.current,
+                 algorithmSelected,
+                 paletteSelected,
+                 scanlineInterval,
+                 val,
+                 effects,
+                 chromaticSlider,
+                 noiseAmplitude);
+            }}/>
+          </label>
             <div>
             <label>
               <input className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
@@ -739,88 +867,26 @@ export default function Home() {
               Pixelate
             </label>
           </div>
-          </div>
-          <div>
-            <label className="flex flex-col">
-              ScanLine Gap: {scanlineInterval}
-              <input
-                className={`${dependentAccentColor}`}
-                type="range"
-                min="1"
-                max="15"
-                step="0.5"
-                value={scanlineInterval}
-                onChange={(e) => {
-                  setScanlineInterval(Number(e.target.value));
-                }}
-                onMouseUp={(e) => {
-                  const val = Number(e.target.value);
-                  if (loadedImgRef.current)
-                    drawCanvas(
-                      loadedImgRef.current,
-                      algorithmSelected,
-                      paletteSelected,
-                      val,
-                      scanlineDarkness,
-                    );
-                }}
-              />
-            </label>
-          </div>
-          <div>
-            <label className="flex flex-col">
-              Scanline Darkness: {scanlineDarkness}
-              <input
-                className={`${dependentAccentColor}`}
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={scanlineDarkness}
-                onChange={(e) => {
-                  setScanlineDarkness(Number(e.target.value));
-                }}
-                onMouseUp={(e) => {
-                  const val = Number(e.target.value);
-                  if (loadedImgRef.current)
-                    drawCanvas(
-                      loadedImgRef.current,
-                      algorithmSelected,
-                      paletteSelected,
-                      scanlineInterval,
-                      val,
-                    );
-                }}
-              />
-            </label>
-          </div>
-          <div>
+          <div className="text-lg">
             <label className="flex flex-col">
               Chromatic Aberration Shift: {chromaticSlider}
-              <input
-                className={`${dependentAccentColor}`}
-                type="range"
-                min="1"
-                max="20"
-                step="1"
-                value={chromaticSlider}
-                onChange={(e) => {
-                  setChromaticSlider(Number(e.target.value));
-                }}
-                onMouseUp={(e) => {
-                  const val = Number(e.target.value);
-                  if (loadedImgRef.current)
-                    drawCanvas(
-                      loadedImgRef.current,
-                      algorithmSelected,
-                      paletteSelected,
-                      scanlineInterval,
-                      scanlineDarkness,
-                      effects,
-                      val,
-                      noiseAmplitude,
-                    );
-                }}
+              <input className={`${dependentAccentColor}`} type="range" min="1" max="20" step="1" value={chromaticSlider}
+              onChange={(e) => {
+                setChromaticSlider(Number(e.target.value));
+              }} 
+              onMouseUp={(e) => {
+                const val = Number(e.target.value);
+                if (loadedImgRef.current) 
+                  drawCanvas(
+                   loadedImgRef.current,
+                   algorithmSelected,
+                   paletteSelected, 
+                   scanlineInterval, 
+                   scanlineDarkness, 
+                   effects, 
+                   val, 
+                   noiseAmplitude,);
+              }}
               />
             </label>
           </div>
