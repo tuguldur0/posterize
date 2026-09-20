@@ -8,8 +8,10 @@ export default function Home() {
   const [paletteSelected, setPaletteSelected] = useState("Green");
   const [scanlineInterval, setScanlineInterval] = useState(2);
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
+  const [customColors, setCustomColors] = useState(["#000000", "#ffffff"]);
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Original"];
+  const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
   const palettes = {
@@ -51,7 +53,31 @@ export default function Home() {
     ]
 
   };
-
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+  };
+  const handleCustomColorChange = (index, value) => {
+    const newColors = [...customColors];
+    newColors[index] = value;
+    setCustomColors(newColors);
+    if (paletteSelected === "Custom" && loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, "Custom", scanlineInterval, scanlineDarkness, newColors);
+    }
+  };
+  const addCustomColor = () => {
+    setCustomColors([...customColors, "#ffffff"]);
+  };
+  const removeCustomColor = (index) => {
+    if (customColors.length <= 2 ) return;
+    const newColors = customColors.filter((_, i) => i !== index);
+    setCustomColors(newColors);
+    if (paletteSelected === "Custom" && loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, "Custom", scanlineInterval, scanlineDarkness, newColors);
+    }
+  };
   const findClosestColor = (r, g, b, pallete) => {
     let minDistance = Infinity;
     let closestColor = pallete[0];
@@ -108,7 +134,6 @@ export default function Home() {
       [3, 11, 1, 9],
       [15, 7, 13, 5],
     ]
-
     for(let y = 0; y < height; y++){
       for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
@@ -128,7 +153,6 @@ export default function Home() {
       }
     }
   };
-
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -177,7 +201,7 @@ export default function Home() {
       }
     }
   }
-  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness)  => {
+  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness, currentCustomColors = customColors)  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -196,7 +220,7 @@ export default function Home() {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     console.log(data); //look
-    const activePalette = palettes[selectedPalette];
+    const activePalette = selectedPalette === "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
       scanlines(height, width, data);
@@ -225,7 +249,40 @@ export default function Home() {
     }
     reader.readAsDataURL(file)
   }
-  const handleAlgorithmChange = (event) => {
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file =e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        loadedImgRef.current = img;
+        drawCanvas(img, algorithmSelected, paletteSelected);
+        setImageSrc(event.target.result);
+      }
+      img.src = event.target.result;
+    }
+    reader.readAsDataURL(file);
+  }
+    const handleAlgorithmChange = (event) => {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if(loadedImgRef.current) {
@@ -256,8 +313,15 @@ export default function Home() {
   }
  }
   return (
-    <div>
-      <h1>Posterize</h1>
+    <div onDragEnter={(e) => {e.preventDefault(); e.stopPropagation(); setIsDragging(true);}} onDragOver={(e) => {e.preventDefault(); e.stopPropagation(); }} onDrop={handleDrop} className={` relative min-h-screen p-5 transition-colors duration-200 ${isDragging ? "bg-slate-200" : "bg-transparent"}`} style={{ minHeight: "100vh"}}>
+      {isDragging && (
+      <div onDragLeave={(e) => {e.preventDefault(); e.stopPropagation(); setIsDragging(false)}} onDragOver={(e) => {e.preventDefault(); e.stopPropagation(); }} onDrop={handleDrop} className="absolute inset-0 z-50 flex items-center justify-center border-4 border-dashed border-gray-400 bg-gray-100 bg-opacity-75 top-0 letf-0 w-full h-full">
+        <div className="p-20 border-8 border-green-500 border-dashed rounded-lg poiinter-events-none">
+        <h2 className="text-4xl font-bold text-green-600">Drop Image Here!</h2>
+          </div>
+      </div>
+      )}
+     <h1>Posterize</h1>
       <div>
         <label>
           Select image:{" "}
@@ -281,9 +345,25 @@ export default function Home() {
             {Object.keys(palettes).map((key, index) =>(
               <option value={key} key={index}>{key}</option>
             ))}
+            <option value="Custom">Custom</option>
           </select>
         </label> 
       </div>
+      {paletteSelected === "Custom" && (
+        <div className="flex flex-wrap gap-3 items-center my-4">
+          <span className="font-semibold">Custom Colors: </span>
+          {customColors.map((color, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <input type="color" value={color} onChange={(e) => handleCustomColorChange(index, e.target.value)} className="w-8 h-8 p-0 border-0 rounded cursor-pointer"/>
+              {customColors.length > 2 && (
+                <button onClick={() => removeCustomColor(index)} className="text-red-500 hover:text-red-700 font-bold px-1"
+                title="Remove Color">x</button>
+              )}
+            </div>
+          ))}
+          <button onClick={addCustomColor} className="px-3 py-1 text-sm text-black bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded shadow-sm">Add Color</button>
+        </div>
+      )}
       <div>
         <label>
           ScanLine Gap: {scanlineInterval}
