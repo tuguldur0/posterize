@@ -6,8 +6,17 @@ export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
   const [algorithmSelected, setAlgorithmSelected] = useState("Original");
   const [paletteSelected, setPaletteSelected] = useState("Green");
-  const [dependentBackground, setDependentBackground] = useState("[#DCE4F3]");
-  const [dependentTextColor, setDependentTextColor] = useState("[#0F380F]");
+  const [dependentBackground, setDependentBackground] =
+    useState("bg-[#DCE4F3]");
+  const [dependentTextColor, setDependentTextColor] =
+    useState("text-[#0F380F]");
+  const [scanlineInterval, setScanlineInterval] = useState(2);
+  const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
+
+  const [newDependentBackground, setNewDependentBackground] =
+    useState("[#DCE4F3]");
+  const [dependentAccentColor, setDependentAccentColor] =
+    useState("accent-[#0F380F]");
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg", "Atkinson", "Original"];
   const canvasRef = useRef(null);
@@ -26,10 +35,10 @@ export default function Home() {
       [235, 235, 235],
     ],
     Neon: [
-      [13, 2, 33],
-      [121, 26, 204],
-      [255, 56, 100],
-      [45, 226, 230],
+      [5, 0, 15],
+      [255, 0, 235],
+      [0, 255, 255],
+      [255, 255, 255],
     ],
     Brown: [
       [68, 36, 12],
@@ -43,56 +52,84 @@ export default function Home() {
       [225, 0, 0],
       [255, 140, 140],
     ],
+    Blue: [
+      [0, 0, 15],
+      [0, 0, 115],
+      [0, 0, 225],
+      [140, 140, 255],
+    ],
   };
 
   //dependent backgroundcolor
   const changeBackground = () => {
     if (algorithmSelected === "Original") {
-      setDependentBackground("[#DCE4F3]");
+      setDependentBackground("bg-[#DCE4F3]");
+      setNewDependentBackground("[#DCE4F3]");
     }
     if (algorithmSelected != "Original") {
       if (paletteSelected === "Green") {
-        setDependentBackground("[#8BAC0F]");
+        setDependentBackground("bg-[#8BAC0F]");
+        setNewDependentBackground("[#8BAC0F]");
       }
       if (paletteSelected === "Gray") {
-        setDependentBackground("[#343434]");
+        setDependentBackground("bg-[#343434]");
+        setNewDependentBackground("[#343434]");
       }
       if (paletteSelected === "Neon") {
-        setDependentBackground("[#ff3864]");
+        setDependentBackground("bg-[#ff3864]");
+        setNewDependentBackground("[#ff3864]");
       }
       if (paletteSelected === "Brown") {
-        setDependentBackground("[#895a30]");
+        setDependentBackground("bg-[#895a30]");
+        setNewDependentBackground("[#895a30]");
       }
       if (paletteSelected === "Red") {
-        setDependentBackground("[#700000]");
+        setDependentBackground("bg-[#700000]");
+        setNewDependentBackground("[#700000]");
+      }
+      if (paletteSelected === "Blue") {
+        setDependentBackground("bg-[#00004b]");
+        setNewDependentBackground("[#00004b]");
       }
     }
   };
   const changeTextColor = () => {
     if (algorithmSelected === "Original") {
-      setDependentTextColor("blue-700");
+      setDependentTextColor("text-blue-700");
+      setDependentAccentColor("accentblue-700");
     }
     if (algorithmSelected != "Original") {
       if (paletteSelected === "Green") {
-        setDependentTextColor("[#0F380F]");
+        setDependentTextColor("text-[#0F380F]");
+        setDependentAccentColor("accent-[#0F380F]");
       }
       if (paletteSelected === "Gray") {
-        setDependentTextColor("gray-400");
+        setDependentTextColor("text-gray-400");
+        setDependentAccentColor("accent-gray-400");
       }
       if (paletteSelected === "Neon") {
-        setDependentTextColor("cyan-500");
+        setDependentTextColor("text-cyan-500");
+        setDependentAccentColor("accent-cyan-500");
       }
       if (paletteSelected === "Brown") {
-        setDependentTextColor("gray-300");
+        setDependentTextColor("text-gray-300");
+        setDependentAccentColor("accent-gray-300");
       }
       if (paletteSelected === "Red") {
-        setDependentTextColor("[#ff3864]");
+        setDependentTextColor("text-[#ff3864]");
+        setDependentAccentColor("accent-[#ff3864]");
+      }
+      if (paletteSelected === "Blue") {
+        setDependentTextColor("text-[#1212b2]");
+        setDependentAccentColor("accent-[#1212b2]");
       }
     }
   };
   useEffect(() => {
     changeBackground();
     changeTextColor();
+
+    console.log(newDependentBackground);
   }, [paletteSelected, algorithmSelected]);
 
   const findClosestColor = (r, g, b, pallete) => {
@@ -145,7 +182,6 @@ export default function Home() {
       }
     }
   };
-
   const bayer4x4 = (data, width, height, pallete) => {
     const bayer4x4 = [
       [0, 8, 2, 10],
@@ -223,8 +259,13 @@ export default function Home() {
       }
     }
   };
-
-  const drawCanvas = (img, algorithm, selectedPalette) => {
+  const drawCanvas = (
+    img,
+    algorithm,
+    selectedPalette,
+    interval = scanlineInterval,
+    darkness = scanlineDarkness,
+  ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -245,12 +286,14 @@ export default function Home() {
     } else if (algorithm == "Atkinson") {
       atkinson(data, width, height, activePalette);
     }
+    if (algorithm !== "Original") {
+      scanlines(height, width, data, interval, darkness);
+    }
     ctx.putImageData(imageData, 0, 0);
   };
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -295,14 +338,14 @@ export default function Home() {
   };
   return (
     <div
-      className={`bg-${dependentBackground} text-${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
+      className={`${dependentBackground} ${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
     >
       <div className="flex justify-center">
         <h1 className="font-mono font-bold text-5xl p-5">Posterizer</h1>
       </div>
       <div className="flex justify-center">
         <div className={`bg-gray-400 w-5xl h-2/4 m-5 box-border`}>
-          <canvas className={`w-5xl`} ref={canvasRef}></canvas>
+          <canvas className="w-5xl" ref={canvasRef}></canvas>
         </div>
         <div className=" flex border-4 pt-5 flex-col p-3 gap-2.5 text-2xl m-5 justify-between">
           <div className="flex flex-col gap-5">
@@ -310,7 +353,7 @@ export default function Home() {
               <label className="flex flex-col gap-2">
                 Image{" "}
                 <input
-                  className={`border-2`}
+                  className={`border-2 hover:cursor-pointer hover:opacity-80`}
                   type="file"
                   accept="image/*"
                   onChange={handleImageUpload}
@@ -321,7 +364,7 @@ export default function Home() {
               <label className="flex flex-col gap-2">
                 Algorithm:{" "}
                 <select
-                  className={` border-2 bg-${dependentBackground} text-${dependentTextColor}`}
+                  className={` border-2 hover:cursor-pointer hover:opacity-80 ${dependentBackground} ${dependentTextColor}`}
                   value={algorithmSelected}
                   onChange={handleAlgorithmChange}
                 >
@@ -338,7 +381,7 @@ export default function Home() {
                 <label className="flex flex-col gap-2">
                   Palette:{" "}
                   <select
-                    className={` border-2 bg-${dependentBackground} text-${dependentTextColor} `}
+                    className={`${dependentBackground} ${dependentTextColor} hover:cursor-pointer hover:opacity-80 border-2`}
                     value={paletteSelected}
                     onChange={handlePaletteChange}
                   >
@@ -352,11 +395,65 @@ export default function Home() {
               )}
             </div>
           </div>
+          <div>
+            <label className="flex flex-col">
+              ScanLine Gap: {scanlineInterval}
+              <input
+                className={`${dependentAccentColor}`}
+                type="range"
+                min="1"
+                max="15"
+                step="0.5"
+                value={scanlineInterval}
+                onChange={(e) => {
+                  setScanlineInterval(Number(e.target.value));
+                }}
+                onMouseUp={(e) => {
+                  const val = Number(e.target.value);
+                  if (loadedImgRef.current)
+                    drawCanvas(
+                      loadedImgRef.current,
+                      algorithmSelected,
+                      paletteSelected,
+                      val,
+                      scanlineDarkness,
+                    );
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <label className="flex flex-col">
+              Scanline Darkness: {scanlineDarkness}
+              <input
+                className={`${dependentAccentColor}`}
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={scanlineDarkness}
+                onChange={(e) => {
+                  setScanlineDarkness(Number(e.target.value));
+                }}
+                onMouseUp={(e) => {
+                  const val = Number(e.target.value);
+                  if (loadedImgRef.current)
+                    drawCanvas(
+                      loadedImgRef.current,
+                      algorithmSelected,
+                      paletteSelected,
+                      scanlineInterval,
+                      val,
+                    );
+                }}
+              />
+            </label>
+          </div>
 
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
               <button
-                className="border-4 hover:cursor-pointer"
+                className="border-4 hover:cursor-pointer hover:opacity-75"
                 onClick={handleReset}
               >
                 Reset
@@ -364,7 +461,7 @@ export default function Home() {
             )}
             {imageSrc && (
               <button
-                className="border-4 hover:cursor-pointer"
+                className="border-4 hover:cursor-pointer hover:opacity-75"
                 onClick={handleExport}
               >
                 Export
