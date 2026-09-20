@@ -12,13 +12,25 @@ export default function Home() {
     useState("text-[#0F380F]");
   const [scanlineInterval, setScanlineInterval] = useState(2);
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
-
-  const [newDependentBackground, setNewDependentBackground] =
-    useState("[#DCE4F3]");
+  const [isDefault, setIsDefault] = useState(false);
   const [dependentAccentColor, setDependentAccentColor] =
     useState("accent-[#0F380F]");
-  // ene deer original nemsen
-  const algorithms = ["Bayer 4x4", "Floyd-Steinberg", "Atkinson", "Original"];
+  const [swappedBackground, setSwappedBackground] =
+    useState("hover:bg-[#0F380F]");
+  const [swappedTextColor, setSwappedTextColor] = useState(
+    "hover:text-[#DCE4F3]",
+  );
+  const algorithms = [
+    "Bayer 4x4",
+    "Floyd-Steinberg",
+    "Atkinson",
+    "Noise",
+    "Original",
+  ];
+  const [effects, setEffects] = useState({
+    scanlines: false,
+    chromaticAberration: false,
+  });
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
   const palettes = {
@@ -60,76 +72,95 @@ export default function Home() {
     ],
   };
 
+  //before and after toggle
+  const handleDefault = () => {
+    if (isDefault === true) {
+      setIsDefault(false);
+      drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected);
+    } else if (algorithmSelected === "Original") {
+      return;
+    } else {
+      drawCanvas(loadedImgRef.current, "Original");
+      setIsDefault(true);
+    }
+    console.log(isDefault);
+  };
+
   //dependent backgroundcolor
   const changeBackground = () => {
     if (algorithmSelected === "Original") {
       setDependentBackground("bg-[#DCE4F3]");
-      setNewDependentBackground("[#DCE4F3]");
+      setSwappedTextColor("hover:text-[#DCE4F3]");
     }
     if (algorithmSelected != "Original") {
       if (paletteSelected === "Green") {
         setDependentBackground("bg-[#8BAC0F]");
-        setNewDependentBackground("[#8BAC0F]");
+        setSwappedTextColor("hover:text-[#8BAC0F]");
       }
       if (paletteSelected === "Gray") {
         setDependentBackground("bg-[#343434]");
-        setNewDependentBackground("[#343434]");
+        setSwappedTextColor("hover:text-[#343434]");
       }
       if (paletteSelected === "Neon") {
         setDependentBackground("bg-[#ff3864]");
-        setNewDependentBackground("[#ff3864]");
+        setSwappedTextColor("hover:text-[#ff3864]");
       }
       if (paletteSelected === "Brown") {
         setDependentBackground("bg-[#895a30]");
-        setNewDependentBackground("[#895a30]");
+        setSwappedTextColor("hover:text-[#895a30]");
       }
       if (paletteSelected === "Red") {
         setDependentBackground("bg-[#700000]");
-        setNewDependentBackground("[#700000]");
+        setSwappedTextColor("hover:text-[#700000]");
       }
       if (paletteSelected === "Blue") {
         setDependentBackground("bg-[#00004b]");
-        setNewDependentBackground("[#00004b]");
+        setSwappedTextColor("hover:text-[#00004b]");
       }
     }
   };
   const changeTextColor = () => {
     if (algorithmSelected === "Original") {
       setDependentTextColor("text-blue-700");
-      setDependentAccentColor("accentblue-700");
+      setDependentAccentColor("accent-blue-700");
+      setSwappedBackground("hover:bg-blue-700");
     }
     if (algorithmSelected != "Original") {
       if (paletteSelected === "Green") {
         setDependentTextColor("text-[#0F380F]");
         setDependentAccentColor("accent-[#0F380F]");
+        setSwappedBackground("hover:bg-[#0F380F]");
       }
       if (paletteSelected === "Gray") {
         setDependentTextColor("text-gray-400");
         setDependentAccentColor("accent-gray-400");
+        setSwappedBackground("hover:bg-gray-400");
       }
       if (paletteSelected === "Neon") {
         setDependentTextColor("text-cyan-500");
         setDependentAccentColor("accent-cyan-500");
+        setSwappedBackground("hover:bg-cyan-500");
       }
       if (paletteSelected === "Brown") {
         setDependentTextColor("text-gray-300");
         setDependentAccentColor("accent-gray-300");
+        setSwappedBackground("hover:bg-gray-300");
       }
       if (paletteSelected === "Red") {
         setDependentTextColor("text-[#ff3864]");
         setDependentAccentColor("accent-[#ff3864]");
+        setSwappedBackground("hover:bg-[#ff3864]");
       }
       if (paletteSelected === "Blue") {
         setDependentTextColor("text-[#1212b2]");
         setDependentAccentColor("accent-[#1212b2]");
+        setSwappedBackground("hover:bg-[#1212b2]");
       }
     }
   };
   useEffect(() => {
     changeBackground();
     changeTextColor();
-
-    console.log(newDependentBackground);
   }, [paletteSelected, algorithmSelected]);
 
   const findClosestColor = (r, g, b, pallete) => {
@@ -147,7 +178,7 @@ export default function Home() {
     }
     return closestColor;
   };
-
+  //algorithms
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -246,10 +277,30 @@ export default function Home() {
       }
     }
   };
+  const noise = (data, width, height, pallete, amplificiation = 40) => {
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let index = (y * width + x) * 4;
+
+        let noise = (Math.random() - 0.5) * 2 * amplificiation;
+
+        let r = data[index] + noise;
+        let g = data[index + 1] + noise;
+        let b = data[index + 2] + noise;
+
+        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
+
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
+      }
+    }
+  };
+  //effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => {
     //will make interval and darkness changable after frontend
     for (let y = 0; y < height; y++) {
-      if (y % interval) {
+      if (y % interval === 0) {
         for (let x = 0; x < width; x++) {
           let index = (y * width + x) * 4;
           data[index] *= darkness;
@@ -259,12 +310,37 @@ export default function Home() {
       }
     }
   };
+  const chromaticAberration = (height, width, data, movement = 4) => {
+    const original = new Uint8ClampedArray(data);
+
+    const getIndex = (x, y) => (y * width + x) * 4;
+    const clampX = (x) => Math.min(width - 1, Math.max(0, x));
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const outIndex = getIndex(x, y);
+
+        const rX = clampX(x + movement);
+        const rIndex = getIndex(rX, y);
+
+        const bX = clampX(x - movement);
+        const bIndex = getIndex(bX, y);
+
+        const gIndex = outIndex;
+
+        data[outIndex] = original[rIndex];
+        data[outIndex + 1] = original[gIndex + 1];
+        data[outIndex + 2] = original[bIndex + 2];
+      }
+    }
+  };
   const drawCanvas = (
     img,
     algorithm,
     selectedPalette,
     interval = scanlineInterval,
     darkness = scanlineDarkness,
+    activeEffects = effects,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -280,15 +356,18 @@ export default function Home() {
     const activePalette = palettes[selectedPalette];
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
-      scanlines(height, width, data);
     } else if (algorithm == "Bayer 4x4") {
       bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson") {
       atkinson(data, width, height, activePalette);
+    } else if (algorithm == "Noise") {
+      noise(data, width, height, activePalette);
     }
-    if (algorithm !== "Original") {
+    if (activeEffects.scanlines) {
       scanlines(height, width, data, interval, darkness);
     }
+    if (activeEffects.chromaticAberration)
+      chromaticAberration(height, width, data);
     ctx.putImageData(imageData, 0, 0);
   };
   const handleImageUpload = (event) => {
@@ -299,7 +378,14 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected, paletteSelected);
+        drawCanvas(
+          img,
+          algorithmSelected,
+          paletteSelected,
+          scanlineInterval,
+          scanlineDarkness,
+          effects,
+        );
         setImageSrc(e.target.result);
       };
       img.src = e.target.result;
@@ -310,7 +396,14 @@ export default function Home() {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if (loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, value, paletteSelected);
+      drawCanvas(
+        loadedImgRef.current,
+        value,
+        paletteSelected,
+        scanlineInterval,
+        scanlineDarkness,
+        effects,
+      );
     }
   };
   // unguu solidog function
@@ -319,6 +412,20 @@ export default function Home() {
     setPaletteSelected(value);
     if (loadedImgRef.current) {
       drawCanvas(loadedImgRef.current, algorithmSelected, value);
+    }
+  };
+  const handleEffectToggle = (effectName) => {
+    const updated = { ...effects, [effectName]: !effects[effectName] };
+    setEffects(updated);
+    if (loadedImgRef.current) {
+      drawCanvas(
+        loadedImgRef.current,
+        algorithmSelected,
+        paletteSelected,
+        scanlineInterval,
+        scanlineDarkness,
+        updated,
+      );
     }
   };
   const handleExport = () => {
@@ -340,14 +447,14 @@ export default function Home() {
     <div
       className={`${dependentBackground} ${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
     >
-      <div className="flex justify-center">
-        <h1 className="font-mono font-bold text-5xl p-5">Posterizer</h1>
+      <div>
+        <h1 className="font-mono font-bold text-5xl p-10">Posterizer</h1>
       </div>
-      <div className="flex justify-center">
-        <div className={`bg-gray-400 w-5xl h-2/4 m-5 box-border`}>
+      <div className="p-10">
+        <div className={`bg-gray-400 w-5xl m-5 box-border`}>
           <canvas className="w-5xl" ref={canvasRef}></canvas>
         </div>
-        <div className=" flex border-4 pt-5 flex-col p-3 gap-2.5 text-2xl m-5 justify-between">
+        <div className=" flex border-4 pt-5 flex-col p-5 gap-2.5 text-2xl justify-between fixed right-0 top-0 h-screen">
           <div className="flex flex-col gap-5">
             <div>
               <label className="flex flex-col gap-2">
@@ -393,6 +500,30 @@ export default function Home() {
                   </select>
                 </label>
               )}
+            </div>
+          </div>
+          <div className="flex p-3 justify-between items-center">
+            <div>
+              <label className="flex gap-2 items-center">
+                <input
+                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
+                  type="checkbox"
+                  checked={effects.scanlines}
+                  onChange={() => handleEffectToggle("scanlines")}
+                />
+                Scanlines
+              </label>
+            </div>
+            <div>
+              <label className="flex gap-2 items-center">
+                <input
+                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
+                  type="checkbox"
+                  checked={effects.chromaticAberration}
+                  onChange={() => handleEffectToggle("chromaticAberration")}
+                />
+                Chromatic Aberration
+              </label>
             </div>
           </div>
           <div>
@@ -453,7 +584,17 @@ export default function Home() {
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
               <button
-                className="border-4 hover:cursor-pointer hover:opacity-75"
+                className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+                onClick={handleDefault}
+              >
+                {isDefault === true || algorithmSelected === "Original"
+                  ? "Before"
+                  : "After"}
+              </button>
+            )}
+            {imageSrc && (
+              <button
+                className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
                 onClick={handleReset}
               >
                 Reset
@@ -461,7 +602,7 @@ export default function Home() {
             )}
             {imageSrc && (
               <button
-                className="border-4 hover:cursor-pointer hover:opacity-75"
+                className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
                 onClick={handleExport}
               >
                 Export
