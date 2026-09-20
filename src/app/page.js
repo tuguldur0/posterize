@@ -21,6 +21,10 @@ export default function Home() {
   );
   const [chromaticSlider, setChromaticSlider] = useState(4);
   const [noiseAmplitude, setNoiseAmplitude] = useState(40);
+  const [brightness, setBrightness] = useState(0);
+  const [contrast, setContrast] = useState(0);
+  const [gamma, setGamma] = useState(1);
+  const [pixelSize, setPixelSize] = useState(8);
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
@@ -33,6 +37,7 @@ export default function Home() {
     scanlines: false,
     chromaticAberration: false,
     invert: false,
+    pixelate: false,
   });
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
@@ -337,6 +342,51 @@ export default function Home() {
       }
     }
   };
+  const pixelate = (data, width, height, blockSize = 8) => {
+    for(let by = 0; by < height; by += blockSize){
+      for(let bx = 0; bx < width; bx += blockSize){
+        const yEnd = Math.min(by + blockSize, height);
+        const xEnd = Math.min(bx + blockSize, width);
+
+        let rSum = 0, gSum = 0, bSum = 0, count = 0;
+        for(let y = by; y < yEnd; y++){
+          for(let x = bx; x < xEnd; x++){
+            const idx = (y * width + x) * 4;
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
+            count++;
+          }
+        }
+        const rAvg = rSum / count, gAvg = gSum / count, bAvg = bSum / count;
+
+        for(let y = by; y < yEnd; y++){
+          for(let x = bx; x < xEnd; x++){
+            const idx = (y * width + x) * 4;
+            data[idx] = rAvg;
+            data[idx + 1] = gAvg;
+            data[idx + 2] = bAvg;
+          }
+        }
+      }
+    }
+  }
+  const adjustColor = (data, brightness = 0, contrast = 0, gamma = 1) => {
+    const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    const invGamma = 1 / gamma;
+
+    for(let i = 0; i < data.length; i+=4){
+      for(let c = 0; c < 3; c++){
+        let v = data[i + c];
+        v += brightness;
+        v = contrastFactor * (v - 128) + 128;
+        v = Math.min(255, Math.max(0, v));
+        v = 255 * Math.pow(v / 255, invGamma);
+        data[i + c] = Math.min(255, Math.max(0, v));
+      }
+    }
+  
+  }
   const invert = (data) => {
     for (let i = 0; i < data.length; i += 4) {
       data[i] = 255 - data[i];
@@ -353,6 +403,10 @@ export default function Home() {
     activeEffects = effects,
     movement = chromaticSlider,
     amplitude = noiseAmplitude,
+    brightnessVal = brightness,
+    contrastVal = contrast,
+    gammaVal = gamma, 
+    blockSize = pixelSize,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -360,8 +414,8 @@ export default function Home() {
     let width = img.width;
     let height = img.height;
     const MAX_Size = 1200;
-    if(width > MAX_Size || height > MAX_Size / height) {
-      const ratio = Math.min(MAX_Size / width, MAX_Size)
+    if(width > MAX_Size || height > MAX_Size) {
+      const ratio = Math.min(MAX_Size / width, MAX_Size / height)
       width = Math.floor(width*ratio);
       height = Math.floor(height * ratio);
     }
@@ -371,6 +425,8 @@ export default function Home() {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     const activePalette = palettes[selectedPalette];
+    if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
+    adjustColor(data, brightnessVal, contrastVal, gammaVal);
     if (activeEffects.invert) invert(data);
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
@@ -556,6 +612,15 @@ export default function Home() {
                 Invert
               </label>
             </div>
+            <div>
+            <label>
+              <input className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
+              type="checkbox"
+              checked={effects.pixelate}
+              onChange={() => handleEffectToggle("pixelate")}/>
+              Pixelate
+            </label>
+          </div>
           </div>
           <div>
             <label className="flex flex-col">
@@ -672,6 +737,44 @@ export default function Home() {
               />
             </label>
           </div>
+          <div>
+            <label className="flex flex-col">
+                Brightness: {brightness}
+                <input 
+                className={`${dependentAccentColor}`}
+                type="range" min="0.1" max="3" step="0.1"
+                value={gamma}
+                onChange={(e) => setGamma(Number(e.target.value))}
+                onMouseUp={(e) => {
+                  const val = Number(e.target.value);
+                  if(loadedImgRef.current){
+                    drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, contrast, val);
+                  }
+                }} />
+            </label>
+          </div>
+
+          <div>
+            <label className="flex flex-col">
+              pixel size: {pixelSize}
+              <input
+              className={'${dependentAccentColor}'}
+              type="range"
+              min="2"
+              max="32"
+              step="1"
+              value={pixelSize}
+              onChange={(e) => setPixelSize(Number(e.target.value))}
+              onMouseUp={(e) => {
+                const val = Number(e.target.value);
+                if(loadedImgRef.current) {
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, contrast, gamma, val);
+                }
+              }} 
+              />
+            </label>
+          </div>
+          
 
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
