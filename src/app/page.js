@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
@@ -22,7 +21,7 @@ export default function Home() {
   );
   const [chromaticSlider, setChromaticSlider] = useState(4);
   const [noiseAmplitude, setNoiseAmplitude] = useState(40);
-  // ene deer original nemsen
+  // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
     "Floyd-Steinberg",
