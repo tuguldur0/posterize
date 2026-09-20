@@ -15,6 +15,7 @@ export default function Home() {
   const [effects, setEffects] = useState({
     scanlines: false,
     chromaticAberration: false,
+    invert: false,
   });
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
@@ -228,6 +229,13 @@ export default function Home() {
       }
     }
   }
+  const invert = (data) => {
+    for(let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i];
+      data[i + 1] = 255 - data[i + 1];
+      data[i + 2] = 255 - data[i + 2]
+    }
+  }
   const drawCanvas = (
     img,
      algorithm, 
@@ -249,6 +257,7 @@ export default function Home() {
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     const activePalette = palettes[selectedPalette];
+    if(activeEffects.invert) invert(data);
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
     } else if (algorithm == "Bayer 4x4"){
@@ -401,7 +410,13 @@ export default function Home() {
       <div>
         <label>
           <input type="checkbox" checked={effects.chromaticAberration} onChange={() => handleEffectToggle("chromaticAberration")}/>
-          Chromatic aberration
+          chromatic aberration
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" checked={effects.invert} onChange={() => handleEffectToggle("invert")}/>
+          invert
         </label>
       </div>
       <div>
