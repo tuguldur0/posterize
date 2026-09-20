@@ -27,9 +27,11 @@ export default function Home() {
   const [pixelSize, setPixelSize] = useState(8);
   const [isSplitView, setIsSplitView] = useState(false);
   const [splitPos, setSplitPos] = useState(50);
-  const originalCanvasRef = useRef(null);
+  const [history, setHistory] = useState([]);
+  const [future, setFuture] = useState([]);
   // ene deer original nemsen.
   const algorithms = [
+    "Bayer 2x2",
     "Bayer 4x4",
     "Bayer 8x8",
     "Floyd-Steinberg",
@@ -84,12 +86,106 @@ export default function Home() {
       [140, 140, 255],
     ],
   };
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if((e.metaKey || e.ctrlKey) && e.key === "s"){
+        e.preventDefault();
+        if(imageSrc) handleExport();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [imageSrc]);
+  useEffect(() => {
+    const onPaste = (e) => {
+      const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"))
+      if(!item) return;
+      const file = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedImgRef.current = img;
+          drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, gamma, levels, pixelSize);
+          setImageSrc(ev.target.result);
+        }
+        img.src = ev.target.result;
+      }
+      reader.readAsDataURL(file);
+    }
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, gamma, levels, pixelSize]);
   const hexToRgb = (hex) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return [r, g, b];
   };
+  const currentSettings = () => ({
+    algorithmSelected, paletteSelected, effects, brightness, contrast, gamma, pixelSize, levels, scanlineInterval, scanlineDarkness, chromaticSlider, noiseAmplitude, customColors,
+  })
+  const applySettings = (s) => {
+    setAlgorithmSelected(s.algorithmSelected);
+    setPaletteSelected(s.paletteSelected);
+    setEffects(s.effects);
+    setBrightness(s.brightness);
+    setContrast(s.contrast);
+    setGamma(s.gamma);
+    setPixelSize(s.pixelSize);
+    setLevels(s.levels);
+    setScanlineInterval(s.scanlineInterval);
+    setScanlineDarkness(s.scanlineDarkness);
+    setChromaticSlider(s.chromaticSlider);
+    setNoiseAmplitude(s.noiseAmplitude);
+    setCustomColors(s.customColors);
+    if(loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, s.algorithmSelected, s.paletteSelected, s.scanlineInterval, s.scanlineDarkness, s.effects, s.chromaticSlider, s.noiseAmplitude, s.customColors, s.brightness, s.contrast, s.gamma, s.levels, s.pixelSize);
+    }
+  };
+  const pushHistory = () =>{
+    setHistory((h) => [...h.slice(-9), currentSettings()]);
+    setFuture([]);
+  }
+  const handleUndo = () => {
+    if (history.length === 0) return;
+    const prev = history[history.length - 1];
+    setFuture((f) => [currentSettings(), ...f]);
+    setHistory((h) => h.slice(0, -1));
+    applySettings(prev);
+  }
+  const handleRedo = () => {
+    if(future.length == 0) return;
+    const next = future[0];
+    setHistory((h) => [...h, currentSettings]);
+    setFuture((f) => f.slice(1));
+    applySettings(next);
+  }
+
+  const handleSavePreset = () => {
+    const preset = currentSettings();
+    const blob = new Blob([JSON.stringify(preset, null, 2)], {type: "application/json"})
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "preset.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const handleLoadPreset = (event) => {
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const preset = JSON.parse(e.target.result);
+        applySettings(preset);
+      } catch {
+        console.log("invalid preset file")
+      }
+    };
+    reader.readAsText(file);
+  }
   const handleCustomColorChange = (index, value) => {
     const newColors = [...customColors];
     newColors[index] = value;
@@ -356,6 +452,25 @@ export default function Home() {
       }
     }
   };
+  const bayer2x2 = (data, width, height, pallete) => {
+    const matrix2x2 = [
+      [0, 2],
+      [3, 1],
+    ]
+    for(let y = 0; y < height; y++){
+      for(let x = 0; x < width; x++){
+        let index = (y * width + x) * 4;
+        const matrix = matrix2x2[y%2][x%2];
+        const bias = (matrix / 4 - 0.5) * 64;
+        let r = Math.min(255, Math.max(0, data[index] + bias))
+        let g = Math.min(255, Math.max(0, data[index + 1] + bias));
+        let b = Math.min(255, Math.max(0, data[index + 2] + bias));
+        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
+        data[index] = newR; data[index + 1] = newG; data[index + 2] = newB;
+
+      }
+    }
+  }
   const halftone = (data, width, height, pallete, cellSize = 8) => {
     const sorted = [...pallete].sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
     const darkColor = sorted[0];
@@ -529,6 +644,8 @@ export default function Home() {
 
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
+    } else if (algorithm == "Bayer 2x2"){
+      bayer2x2(data, width, height, activePalette);
     } else if (algorithm == "Bayer 4x4") {
       bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson") {
@@ -679,17 +796,19 @@ export default function Home() {
     if(loadedImgRef.current) {
       drawCanvas(
         loadedImgRef.current,
-        defaults.algorithm, 
+        defaults.algorithm,
         defaults.palette,
-        defaults.interval, 
+        defaults.interval,
         defaults.darkness,
         defaults.effects,
-        defaults.movement, 
+        defaults.movement,
         defaults.amplitude,
+        customColors,
         defaults.brightnessVal,
         defaults.contrastVal,
         defaults.gammaVal,
-        defaults.blockSize, 
+        8,
+        defaults.blockSize,
       )
 
     }
@@ -718,14 +837,13 @@ export default function Home() {
       setEffects(randomEffects);
     drawCanvas(
       loadedImgRef.current,
-      randomAlgo,
+      randomAlgo, 
       randomPalette,
       randomInterval,
       randomDarkness,
-      randomInterval,
       randomEffects,
-      randomMovement,
-      randomAmplitude
+      randomMovement, 
+      randomAmplitude,
     );
   };
   return (
@@ -993,9 +1111,27 @@ export default function Home() {
                 onMouseUp={(e) => {
                   const val = Number(e.target.value);
                   if(loadedImgRef.current){
-                    drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, contrast, val);
+                    drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, val);
                   }
                 }} />
+            </label>
+          </div>
+          <div>
+            <label>
+              Levels: {levels}
+              <input className={`${dependentAccentColor}`}
+              type="range"
+              min="2"
+              max="16"
+              step="1"
+              value={levels}
+              onChange={(e) => setLevels(Number(e.target.value))}
+              onMouseUp={(e) => {
+              const val = Number(e.target.value)
+              if(loadedImgRef.current) {
+                drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, gamma, val, pixelSize);
+              }
+              }}/>  
             </label>
           </div>
           <div>
@@ -1012,7 +1148,7 @@ export default function Home() {
               onMouseUp={(e) => {
                 const val = Number(e.target.value);
                 if(loadedImgRef.current){
-                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, val, contrast, gamma, pixelSize);
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, val, contrast, gamma);
                 }
               }}
               />
@@ -1032,7 +1168,7 @@ export default function Home() {
               onMouseUp={(e) => {
                 const val = Number(e.target.value);
                 if(loadedImgRef.current){
-                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, val, gamma, pixelSize);
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, val, gamma);
                 }
               }}
               />
@@ -1052,7 +1188,7 @@ export default function Home() {
               onMouseUp={(e) => {
                 const val = Number(e.target.value);
                 if(loadedImgRef.current) {
-                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, contrast, gamma, val);
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, gamma, 8, val);
                 }
               }} 
               />
@@ -1077,7 +1213,7 @@ export default function Home() {
               </button>
             )}
             {imageSrc && (
-              <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+              <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
               onClick={handleRandomizer}>Random</button>
             )}
             {imageSrc && (
@@ -1096,6 +1232,17 @@ export default function Home() {
                 Export
               </button>
             )}
+            <button>
+              <label>
+                Load preset
+                <input 
+                type="file"
+                accept="application/json"
+                onChange={handleLoadPreset}
+                className="hidden"
+                />
+              </label>
+            </button>
           </div>
         </div>
       </div>
