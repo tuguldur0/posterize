@@ -1,4 +1,5 @@
 "use client";
+import confetti from "canvas-confetti";
 import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
@@ -24,6 +25,9 @@ export default function Home() {
   const [contrast, setContrast] = useState(0);
   const [gamma, setGamma] = useState(1);
   const [pixelSize, setPixelSize] = useState(8);
+  const [isSplitView, setIsSplitView] = useState(false);
+  const [splitPos, setSplitPos] = useState(50);
+  const originalCanvasRef = useRef(null);
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
@@ -273,8 +277,6 @@ export default function Home() {
       }
     }
   };
-<<<<<<< HEAD
-=======
   const bayer8x8 = (data, width, height, pallete) => {
     const matrix8x8 = [
       [0, 48, 12, 60, 3, 51, 15, 63],
@@ -299,8 +301,6 @@ export default function Home() {
       }
     }
   }
-
->>>>>>> abeb501c8b26ddfc808f1b7999b613b9eb5724f7
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -502,6 +502,7 @@ export default function Home() {
     brightnessVal = brightness,
     contrastVal = contrast,
     gammaVal = gamma, 
+    levelsVal = 8,
     blockSize = pixelSize,
   ) => {
     const canvas = canvasRef.current;
@@ -635,6 +636,10 @@ export default function Home() {
   const handleExport = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    confetti({particleCount: 100, 
+      spread: 70,
+       origin: { y: 0.6}
+    });
     const link = document.createElement("a");
     link.download = "export.png";
     link.href = canvas.toDataURL("image/png");
@@ -689,7 +694,40 @@ export default function Home() {
 
     }
   };
-
+  const handleRandomizer = () => {
+    if (!loadedImgRef.current) return;
+    const randomAlgo = algorithms[Math.floor(Math.random() * algorithms.length)];
+    const paletteKeys = Object.keys(palettes);
+    const randomPalette = paletteKeys[Math.floor(Math.random() * paletteKeys.length)];
+    const randomInterval = Math.floor(Math.random() * 8) + 1;
+    const randomDarkness = Number((Math.random() * 0.8 +0.1).toFixed(1));
+    const randomMovement = Math.floor(Math.random() * 15) +1;
+    const randomAmplitude = Math.floor(Math.random() * 80) + 10;
+    const randomEffects = {
+      scanlines: Math.random() > 0.5,
+      chromaticAberration: Math.random() > 0.5,
+      invert: Math.random() > 0.8,
+      pixelate: Math.random() > 0.7,
+    };
+    setAlgorithmSelected(randomAlgo);
+    setPaletteSelected(randomPalette);
+    setScanlineInterval(randomInterval);
+    setScanlineDarkness(randomDarkness);
+    setChromaticSlider(randomMovement);
+    setNoiseAmplitude(randomAmplitude);
+      setEffects(randomEffects);
+    drawCanvas(
+      loadedImgRef.current,
+      randomAlgo,
+      randomPalette,
+      randomInterval,
+      randomDarkness,
+      randomInterval,
+      randomEffects,
+      randomMovement,
+      randomAmplitude
+    );
+  };
   return (
     <div
      onDragEnter={(e) => {e.preventDefault(); e.stopPropagation(); setIsDragging(true);}}
@@ -712,8 +750,33 @@ export default function Home() {
            <h1 className="p-10 font-bold text-5xl">Posterize</h1>
         </div>
       <div className="p-8 flex items-center justify-center p-8 flex-1">
-      <div className="bg-gray-400 p-2 shadow-lg inline-block box-border">
+        <div className="relative bg-gray-400 p-2 shadow-lg inline-block box-border select-none overflow-hidden"
+        onMouseMove={(e) => {
+          if (!isSplitView) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+          setSplitPos((x / rect.width) * 100);
+        }}>
         <canvas className="block max-w-full h-auto" ref={canvasRef}></canvas>
+
+        {imageSrc && canvasRef.current && (
+          <div className="absolute bottom-4 right-4 bg-black text-white text-xs px-2 py-2 opacity-80 pointer-events-none rounded shadow">
+            {canvasRef.current.width} x {canvasRef.current.height}px
+          </div>
+        )}
+        {isSplitView && imageSrc && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden border-2 border-white"
+          style={{ clipPath: `inset(0 ${100 - splitPos}% 0 0)`}}>
+            <img src={imageSrc} alt="Original zurag" className="absolute inset-0 w-full h-full object-contain max-w-none" style={{width: canvasRef.current?.width || '100%', height: canvasRef.current?.height || '100%'}}
+              /> 
+        </div>           
+       )}
+       {isSplitView && (
+        <div className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(0,0,0,0,8)] cursor-ew-resize pointer-events-none"
+          style={{ left: `${splitPos}%`}}>
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 bg-white rounded-full shadow-md flex items-center justify-center text-xs text-black font-bold">
+            ↔ </div>   
+            </div>    )}
         </div>
         </div>
         </div>
@@ -888,6 +951,7 @@ export default function Home() {
               />
             </label>
           </div>
+
           <div>
             <label className="flex flex-col">
               noise amplitude: {noiseAmplitude}
@@ -975,7 +1039,6 @@ export default function Home() {
               />
             </label>
           </div>
-
           <div>
             <label className="flex flex-col">
               pixel size: {pixelSize}
@@ -997,17 +1060,26 @@ export default function Home() {
             </label>
           </div>
           
-
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
               <button
-                className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+                className={`border-4 py-2 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
                 onClick={handleDefault}
               >
                 {isDefault === true || algorithmSelected === "Original"
                   ? "Before"
                   : "After"}
               </button>
+            )}
+            {imageSrc && (
+              <button className={`border-4 py-2 hover:cursor-pointer ${isSplitView ? "bg-white text-black" : swappedBackground} ${swappedTextColor} transition-all duration-300`}
+              onClick={() => setIsSplitView(!isSplitView)}>
+                {isSplitView ? "Exit Split View" : "Split view"}
+              </button>
+            )}
+            {imageSrc && (
+              <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+              onClick={handleRandomizer}>Random</button>
             )}
             {imageSrc && (
               <button
