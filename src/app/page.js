@@ -25,6 +25,7 @@ export default function Home() {
   const [contrast, setContrast] = useState(0);
   const [gamma, setGamma] = useState(1);
   const [pixelSize, setPixelSize] = useState(8);
+  const [levels, setLevels] = useState(8);
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
@@ -448,8 +449,8 @@ export default function Home() {
     }
   
   }
-  const posterizeLevels = (data, levels = 8) => {
-    const step = 255 / (levels - 1);
+  const posterizeLevels = (data, levelsVal) => {
+    const step = 255 / (levelsVal - 1);
     for(let i = 0; i < data.length; i += 4){
       for(let c = 0; c < 3; c++) {
         data[i + c] = Math.round(Math.round(data[i + c] / step) * step);
@@ -476,6 +477,7 @@ export default function Home() {
     contrastVal = contrast,
     gammaVal = gamma, 
     blockSize = pixelSize,
+    levelsVal = levels,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -496,7 +498,7 @@ export default function Home() {
     const activePalette = palettes[selectedPalette];
     if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
     adjustColor(data, brightnessVal, contrastVal, gammaVal);
-    posterizeLevels(data, levelsVal)
+    posterizeLevels(data, levels)
     if (activeEffects.invert) invert(data);
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
