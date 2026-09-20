@@ -28,9 +28,11 @@ export default function Home() {
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
+    "Bayer 8x8",
     "Floyd-Steinberg",
     "Atkinson",
     "Noise",
+    "Halftone",
     "Original",
   ];
   const [effects, setEffects] = useState({
@@ -248,6 +250,30 @@ export default function Home() {
       }
     }
   };
+  const bayer8x8 = (data, width, height, pallete) => {
+    const matrix8x8 = [
+      [0, 48, 12, 60, 3, 51, 15, 63],
+      [32, 16, 44, 28, 35, 19, 47, 31],
+      [8, 56, 4, 52, 11, 59, 7, 55],
+      [40, 24, 36, 20, 43, 27, 39, 23],
+      [2, 50, 14, 62, 1, 49, 13, 61],
+      [34, 18, 46, 30, 33, 17, 45, 29],
+      [10, 58, 6, 54, 9, 57, 5, 53],
+      [42, 26, 38, 22, 41, 25, 37, 21],
+    ];
+    for(let y = 0; y < height; y++){
+      for(let x = 0; x < width; x++){
+        let index = (y * width + x) * 4;
+        const matrix = matrix8x8[y%8][x%8];
+        const bias = (matrix/64 -0.5) * 64;
+        let r = Math.min(255, Math.max(0, data[index] + bias));
+        let g = Math.min(255, Math.max(0, data[index + 1] + bias))
+        let b = Math.min(255, Math.max(0, data[index + 2] + bias));
+        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
+        data[index] = newR; data[index + 1] = newG; data[index+2] = newB;
+      }
+    }
+  }
 
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
@@ -304,6 +330,41 @@ export default function Home() {
       }
     }
   };
+  const halftone = (data, width, height, pallete, cellSize = 8) => {
+    const sorted = [...pallete].sort((a, b) => (a[0] + a[1] + a[2]) - (b[0] + b[1] + b[2]));
+    const darkColor = sorted[0];
+    const lightColor = sorted[sorted.length - 1];
+    
+    for(let by = 0; by < height; by += cellSize) {
+      for(let bx = 0; bx < width; bx += cellSize) {
+        const yEnd = Math.min(by + cellSize, height);
+        const xEnd = Math.min(bx + cellSize, width);
+
+        let sum = 0, count = 0;
+        for(let y = by; y < yEnd; y++){
+          for(let x = bx; x < xEnd; x++){
+            const idx = (y * width + x) * 4;
+            sum += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+            count++;
+          }
+        }
+        const darkness = 1 - (sum / count) / 255; 
+        const radius = (cellSize / 2) * Math.sqrt(darkness);
+        const cx = bx + (xEnd - bx) / 2;
+        const cy = by + (yEnd - by) / 2;
+
+        for(let y = by; y < yEnd; y++) {
+          for(let x = bx; x < xEnd; x++){
+            const idx = (y * width + x) * 4;
+            const dx = x + 0.5 - cx, dy = y + 0.5 -cy;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const color = dist <= radius ? darkColor : lightColor;
+            data[idx] = color[0]; data[idx + 1] = color[1]; data[idx + 2] = color[2];
+          }
+        }
+      }
+    }
+  }
   //effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => {
     //will make interval and darkness changable after frontend
@@ -387,6 +448,14 @@ export default function Home() {
     }
   
   }
+  const posterizeLevels = (data, levels = 8) => {
+    const step = 255 / (levels - 1);
+    for(let i = 0; i < data.length; i += 4){
+      for(let c = 0; c < 3; c++) {
+        data[i + c] = Math.round(Math.round(data[i + c] / step) * step);
+      }
+    }
+  }
   const invert = (data) => {
     for (let i = 0; i < data.length; i += 4) {
       data[i] = 255 - data[i];
@@ -427,6 +496,7 @@ export default function Home() {
     const activePalette = palettes[selectedPalette];
     if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
     adjustColor(data, brightnessVal, contrastVal, gammaVal);
+    posterizeLevels(data, levelsVal)
     if (activeEffects.invert) invert(data);
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
@@ -436,6 +506,10 @@ export default function Home() {
       atkinson(data, width, height, activePalette);
     } else if (algorithm == "Noise") {
       noise(data, width, height, activePalette, amplitude);
+    } else if (algorithm == "Bayer 8x8"){
+      bayer8x8(data, width, height, activePalette);
+    } else if (algorithm == "Halftone"){
+      halftone(data, width, height, activePalette, blockSize);
     }
     if (activeEffects.scanlines) {
       scanlines(height, width, data, interval, darkness);
@@ -513,9 +587,51 @@ export default function Home() {
   };
   // reset buttonii function
   const handleReset = () => {
-    setAlgorithmSelected("Original");
-    if (loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, "Original", paletteSelected);
+    const defaults = {
+      algorithm: "Original",
+      palette: "Green",
+      interval: 2,
+      darkness: 0.5,
+      movement: 4,
+      amplitude: 40,
+      brightnessVal: 0,
+      contrastVal: 0,
+      gammaVal: 1,
+      blockSize: 8,
+      effects: {
+        scanlines: false,
+        chromaticAberration: false,
+        invert: false,
+        pixelate: false,
+      },
+    }
+    setAlgorithmSelected(defaults.algorithm);
+    setPaletteSelected(defaults.palette);
+    setScanlineInterval(defaults.interval);
+    setScanlineDarkness(defaults.darkness);
+    setChromaticSlider(defaults.movement);
+    setNoiseAmplitude(defaults.amplitude);
+    setBrightness(defaults.brightnessVal);
+    setContrast(defaults.contrastVal);
+    setGamma(defaults.gammaVal);
+    setPixelSize(defaults.blockSize);
+    setEffects(defaults.effects);
+    if(loadedImgRef.current) {
+      drawCanvas(
+        loadedImgRef.current,
+        defaults.algorithm, 
+        defaults.palette,
+        defaults.interval, 
+        defaults.darkness,
+        defaults.effects,
+        defaults.movement, 
+        defaults.amplitude,
+        defaults.brightnessVal,
+        defaults.contrastVal,
+        defaults.gammaVal,
+        defaults.blockSize, 
+      )
+
     }
   };
 
@@ -739,7 +855,7 @@ export default function Home() {
           </div>
           <div>
             <label className="flex flex-col">
-                Brightness: {brightness}
+                Gamma: {gamma}
                 <input 
                 className={`${dependentAccentColor}`}
                 type="range" min="0.1" max="3" step="0.1"
@@ -753,12 +869,52 @@ export default function Home() {
                 }} />
             </label>
           </div>
+          <div>
+            <label>
+              Brightness: {brightness}
+              <input 
+              className={`${dependentAccentColor}`}
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={brightness}
+              onChange={(e) => setBrightness(Number(e.target.value))}
+              onMouseUp={(e) => {
+                const val = Number(e.target.value);
+                if(loadedImgRef.current){
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, val, contrast, gamma, pixelSize);
+                }
+              }}
+              />
+            </label>
+          </div>
+
+          <div>
+            <label className="flex flex-col">
+              Contrast: {contrast}
+              <input className={`${dependentAccentColor}`}
+              type="range"
+              min="-100"
+              max="100"
+              step="1"
+              value={contrast}
+              onChange={(e) => setContrast(Number(e.target.value))}
+              onMouseUp={(e) => {
+                const val = Number(e.target.value);
+                if(loadedImgRef.current){
+                  drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, brightness, val, gamma, pixelSize);
+                }
+              }}
+              />
+            </label>
+          </div>
 
           <div>
             <label className="flex flex-col">
               pixel size: {pixelSize}
               <input
-              className={'${dependentAccentColor}'}
+              className={`${dependentAccentColor}`}
               type="range"
               min="2"
               max="32"
