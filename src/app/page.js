@@ -8,15 +8,8 @@ export default function Home() {
   const [paletteSelected, setPaletteSelected] = useState("Green");
   const [scanlineInterval, setScanlineInterval] = useState(2);
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
-  const [chromaticSlider, setChromaticSlider] = useState(4);
-  const [noiseAmplitude, setNoiseAmplitude] = useState(40);
   // ene deer original nemsen
-  const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Noise", "Original"];
-  const [effects, setEffects] = useState({
-    scanlines: false,
-    chromaticAberration: false,
-    invert: false,
-  });
+  const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Original"];
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
   const palettes = {
@@ -74,7 +67,7 @@ export default function Home() {
     }
     return closestColor;
   };
-//algorithms
+
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -87,7 +80,6 @@ export default function Home() {
     for(let y = 0; y < height; y++){
       for(let x = 0; x < width; x++){
         let index = (y * width + x) * 4;
-        
         let oldR = data[index];
         let oldG = data[index + 1];
         let oldB = data[index + 2];
@@ -173,29 +165,9 @@ export default function Home() {
       }
     }
   }
-  const noise = (data, width, height, pallete, amplificiation = 40) => {
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
-        let index = (y * width + x) * 4;
-
-        let noise = (Math.random() - 0.5) * 2 * amplificiation;
-
-        let r = data[index] + noise;
-        let g = data[index + 1] + noise;
-        let b = data[index + 2] + noise;
-
-        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
-
-        data[index] = newR;
-        data[index + 1] = newG;
-        data[index + 2] = newB;
-      }
-    }
-  }
-  //effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
     for(let y = 0; y < height; y++){
-      if(y % interval === 0) {
+      if(y % interval) {
         for(let x=0; x <width; x++ ){
           let index = (y * width + x) * 4;
           data[index] *= darkness; 
@@ -205,72 +177,37 @@ export default function Home() {
       }
     }
   }
-  const chromaticAberration = (height, width, data, movement = 4) => {
-    const original = new Uint8ClampedArray(data);
-
-    const getIndex = (x, y) => (y * width + x) * 4;
-    const clampX = (x) => Math.min(width-1, Math.max(0,x));
-
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
-        const outIndex = getIndex(x, y);
-
-        const rX = clampX(x + movement);
-        const rIndex = getIndex(rX, y);
-
-        const bX = clampX(x - movement);
-        const bIndex = getIndex(bX, y);
-
-        const gIndex = outIndex;
-
-        data[outIndex] = original[rIndex];
-        data[outIndex + 1] = original[gIndex + 1];
-        data[outIndex + 2] = original[bIndex + 2];
-      }
-    }
-  }
-  const invert = (data) => {
-    for(let i = 0; i < data.length; i += 4) {
-      data[i] = 255 - data[i];
-      data[i + 1] = 255 - data[i + 1];
-      data[i + 2] = 255 - data[i + 2]
-    }
-  }
-  const drawCanvas = (
-    img,
-     algorithm, 
-     selectedPalette, 
-     interval = scanlineInterval, 
-     darkness = scanlineDarkness, 
-     activeEffects = effects,
-     movement = chromaticSlider,
-     amplitude = noiseAmplitude,
-    )  => {
+  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness)  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ctx = canvas.getContext("2d");
     let width = img.width;
     let height = img.height;
+    // ene safety guard shuu
+    const MAX_SIZE = 1200;
+    if(width > MAX_SIZE || height > MAX_SIZE) {
+      const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+      width = Math.floor(width * ratio);
+      height = Math.floor(height * ratio);
+    }
     canvas.width = width;
     canvas.height = height;
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, 0, 0, width, height);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
+    console.log(data); //look
     const activePalette = palettes[selectedPalette];
-    if(activeEffects.invert) invert(data);
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
+      scanlines(height, width, data);
     } else if (algorithm == "Bayer 4x4"){
       bayer4x4(data, width, height, activePalette);
     } else if (algorithm == "Atkinson"){
       atkinson(data, width, height, activePalette);
-    } else if (algorithm == "Noise"){
-      noise(data, width, height, activePalette, amplitude)
     }
-    if(activeEffects.scanlines){
-      scanlines(height, width, data, interval, darkness);
+    if (algorithm !== "Original") {
+      scanlines(height, width , data, interval, darkness);
     }
-    if(activeEffects.chromaticAberration) chromaticAberration(height, width, data, movement)
     ctx.putImageData(imageData, 0, 0);
   }
   const handleImageUpload = (event) => {
@@ -281,7 +218,7 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider);
+        drawCanvas(img, algorithmSelected, paletteSelected);
         setImageSrc(e.target.result);
       }
       img.src = e.target.result;
@@ -292,7 +229,7 @@ export default function Home() {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if(loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, value, paletteSelected, scanlineInterval,scanlineDarkness, effects);
+      drawCanvas(loadedImgRef.current, value, paletteSelected);
     }
   }
   // unguu solidog function
@@ -301,13 +238,6 @@ export default function Home() {
     setPaletteSelected(value);
     if (loadedImgRef.current) {
       drawCanvas(loadedImgRef.current, algorithmSelected, value);
-    }
-  }
-  const handleEffectToggle = (effectName) => {
-    const updated = {...effects, [effectName]: !effects[effectName]};
-    setEffects(updated);
-    if(loadedImgRef.current){
-      drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, updated)
     }
   }
   const handleExport = () => {
@@ -375,48 +305,6 @@ export default function Home() {
             if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, val);
 
           }} />
-        </label>
-      </div>
-      <div>
-        <label>
-          Chromatic Aberration Shift: {chromaticSlider}
-          <input type="range" min="1" max="20" step="1" value={chromaticSlider} onChange={(e) => {setChromaticSlider(Number(e.target.value))}} onMouseUp={(e) => {
-            const val = Number(e.target.value);
-            if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, val, noiseAmplitude);
-
-          }}/>
-        </label>
-      </div>
-      <div>
-        <label>
-          noise amplitude: {noiseAmplitude}
-          <input type="range" min="0" max="100" step="1" value={noiseAmplitude} onChange={(e) => {
-            setNoiseAmplitude(Number(e.target.value));
-          }} onMouseUp={(e) => {
-            const val = Number(e.target.value);
-            if(loadedImgRef.current){
-              drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, val)
-
-            }
-          }}/>
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="checkbox" checked={effects.scanlines} onChange={() => handleEffectToggle("scanlines")}/>
-          scanlines
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="checkbox" checked={effects.chromaticAberration} onChange={() => handleEffectToggle("chromaticAberration")}/>
-          chromatic aberration
-        </label>
-      </div>
-      <div>
-        <label>
-          <input type="checkbox" checked={effects.invert} onChange={() => handleEffectToggle("invert")}/>
-          invert
         </label>
       </div>
       <div>
