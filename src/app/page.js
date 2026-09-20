@@ -20,6 +20,9 @@ export default function Home() {
   const [swappedTextColor, setSwappedTextColor] = useState(
     "hover:text-[#DCE4F3]",
   );
+  const [chromaticSlider, setChromaticSlider] = useState(4);
+  const [noiseAmplitude, setNoiseAmplitude] = useState(40);
+  // ene deer original nemsen
   const algorithms = [
     "Bayer 4x4",
     "Floyd-Steinberg",
@@ -30,6 +33,7 @@ export default function Home() {
   const [effects, setEffects] = useState({
     scanlines: false,
     chromaticAberration: false,
+    invert: false,
   });
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
@@ -334,6 +338,13 @@ export default function Home() {
       }
     }
   };
+  const invert = (data) => {
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 255 - data[i];
+      data[i + 1] = 255 - data[i + 1];
+      data[i + 2] = 255 - data[i + 2];
+    }
+  };
   const drawCanvas = (
     img,
     algorithm,
@@ -341,6 +352,8 @@ export default function Home() {
     interval = scanlineInterval,
     darkness = scanlineDarkness,
     activeEffects = effects,
+    movement = chromaticSlider,
+    amplitude = noiseAmplitude,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -352,8 +365,8 @@ export default function Home() {
     ctx.drawImage(img, 0, 0);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    console.log(data); //look
     const activePalette = palettes[selectedPalette];
+    if (activeEffects.invert) invert(data);
     if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
     } else if (algorithm == "Bayer 4x4") {
@@ -361,13 +374,13 @@ export default function Home() {
     } else if (algorithm == "Atkinson") {
       atkinson(data, width, height, activePalette);
     } else if (algorithm == "Noise") {
-      noise(data, width, height, activePalette);
+      noise(data, width, height, activePalette, amplitude);
     }
     if (activeEffects.scanlines) {
       scanlines(height, width, data, interval, darkness);
     }
     if (activeEffects.chromaticAberration)
-      chromaticAberration(height, width, data);
+      chromaticAberration(height, width, data, movement);
     ctx.putImageData(imageData, 0, 0);
   };
   const handleImageUpload = (event) => {
@@ -385,6 +398,7 @@ export default function Home() {
           scanlineInterval,
           scanlineDarkness,
           effects,
+          chromaticSlider,
         );
         setImageSrc(e.target.result);
       };
@@ -454,7 +468,7 @@ export default function Home() {
         <div className={`bg-gray-400 w-5xl m-5 box-border`}>
           <canvas className="w-5xl" ref={canvasRef}></canvas>
         </div>
-        <div className=" flex border-4 pt-5 flex-col p-5 gap-2.5 text-2xl justify-between fixed right-0 top-0 h-screen">
+        <div className=" flex border-4 pt-5 flex-col p-5 gap-2.5 text-2xl justify-between w-3xl fixed right-0 top-0 h-screen">
           <div className="flex flex-col gap-5">
             <div>
               <label className="flex flex-col gap-2">
@@ -502,7 +516,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="flex p-3 justify-between items-center">
+          <div className="flex gap-3 p-3 justify-between items-center flex-wrap">
             <div>
               <label className="flex gap-2 items-center">
                 <input
@@ -523,6 +537,17 @@ export default function Home() {
                   onChange={() => handleEffectToggle("chromaticAberration")}
                 />
                 Chromatic Aberration
+              </label>
+            </div>
+            <div>
+              <label className="flex gap-2 items-center">
+                <input
+                  className={`${dependentAccentColor} hover:cursor-pointer w-5 h-5`}
+                  type="checkbox"
+                  checked={effects.invert}
+                  onChange={() => handleEffectToggle("invert")}
+                />
+                Invert
               </label>
             </div>
           </div>
@@ -576,6 +601,67 @@ export default function Home() {
                       scanlineInterval,
                       val,
                     );
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <label className="flex flex-col">
+              Chromatic Aberration Shift: {chromaticSlider}
+              <input
+                className={`${dependentAccentColor}`}
+                type="range"
+                min="1"
+                max="20"
+                step="1"
+                value={chromaticSlider}
+                onChange={(e) => {
+                  setChromaticSlider(Number(e.target.value));
+                }}
+                onMouseUp={(e) => {
+                  const val = Number(e.target.value);
+                  if (loadedImgRef.current)
+                    drawCanvas(
+                      loadedImgRef.current,
+                      algorithmSelected,
+                      paletteSelected,
+                      scanlineInterval,
+                      scanlineDarkness,
+                      effects,
+                      val,
+                      noiseAmplitude,
+                    );
+                }}
+              />
+            </label>
+          </div>
+          <div>
+            <label className="flex flex-col">
+              noise amplitude: {noiseAmplitude}
+              <input
+                className={`${dependentAccentColor}`}
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={noiseAmplitude}
+                onChange={(e) => {
+                  setNoiseAmplitude(Number(e.target.value));
+                }}
+                onMouseUp={(e) => {
+                  const val = Number(e.target.value);
+                  if (loadedImgRef.current) {
+                    drawCanvas(
+                      loadedImgRef.current,
+                      algorithmSelected,
+                      paletteSelected,
+                      scanlineInterval,
+                      scanlineDarkness,
+                      effects,
+                      chromaticSlider,
+                      val,
+                    );
+                  }
                 }}
               />
             </label>
