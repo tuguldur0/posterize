@@ -25,9 +25,13 @@ export default function Home() {
   const [contrast, setContrast] = useState(0);
   const [gamma, setGamma] = useState(1);
   const [pixelSize, setPixelSize] = useState(8);
+<<<<<<< HEAD
   const [isSplitView, setIsSplitView] = useState(false);
   const [splitPos, setSplitPos] = useState(50);
   const originalCanvasRef = useRef(null);
+=======
+  const [levels, setLevels] = useState(8);
+>>>>>>> a1c48e28148d7b372f54575d9f69be1652c02b9a
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 4x4",
@@ -288,19 +292,25 @@ export default function Home() {
       [10, 58, 6, 54, 9, 57, 5, 53],
       [42, 26, 38, 22, 41, 25, 37, 21],
     ];
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
-        const matrix = matrix8x8[y%8][x%8];
-        const bias = (matrix/64 -0.5) * 64;
+        const matrix = matrix8x8[y % 8][x % 8];
+        const bias = (matrix / 64 - 0.5) * 64;
         let r = Math.min(255, Math.max(0, data[index] + bias));
-        let g = Math.min(255, Math.max(0, data[index + 1] + bias))
+        let g = Math.min(255, Math.max(0, data[index + 1] + bias));
         let b = Math.min(255, Math.max(0, data[index + 2] + bias));
         const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
-        data[index] = newR; data[index + 1] = newG; data[index+2] = newB;
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
       }
     }
+<<<<<<< HEAD
   }
+=======
+  };
+>>>>>>> a1c48e28148d7b372f54575d9f69be1652c02b9a
   const atkinson = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
@@ -474,8 +484,8 @@ export default function Home() {
     }
   
   }
-  const posterizeLevels = (data, levels = 8) => {
-    const step = 255 / (levels - 1);
+  const posterizeLevels = (data, levelsVal) => {
+    const step = 255 / (levelsVal - 1);
     for(let i = 0; i < data.length; i += 4){
       for(let c = 0; c < 3; c++) {
         data[i + c] = Math.round(Math.round(data[i + c] / step) * step);
@@ -504,6 +514,7 @@ export default function Home() {
     gammaVal = gamma, 
     levelsVal = 8,
     blockSize = pixelSize,
+    levelsVal = levels,
   ) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -524,7 +535,7 @@ export default function Home() {
     const activePalette = selectedPalette === "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
     if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
     adjustColor(data, brightnessVal, contrastVal, gammaVal);
-    posterizeLevels(data, levelsVal)
+    posterizeLevels(data, levels)
     if (activeEffects.invert) invert(data);
 
     if (algorithm == "Floyd-Steinberg") {
