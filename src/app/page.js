@@ -178,6 +178,31 @@ export default function Home() {
       }
     }
   }
+  const distort = (height, width, data, distortion = 4) => {
+    const original = new Uint8ClampedArray(data);
+
+    const getIndex = (x, y) => (y * width + x) * 4;
+    const clampX = (x) => Math.min(width-1, Math.max(0,x));
+
+    for(let y = 0; y < height; y++){
+      for(let x = 0; x < width; x++){
+        const outIndex = getIndex(x,y);
+
+        const rX = clampX(x+ movement);
+        const rIndex = getIndex(rX, y);
+
+        const bX = clampX(x - movement);
+        const bIndex = getIndex(bX, y);
+
+        const gIndex = getIndex(x, y);
+
+        data[outIndex] = original[rIndex];
+        data[outIndex + 1] = original[gIndex + 1];
+        data[outIndex + 2] = original[gIndex + 2];
+      }
+      
+    }
+  }
   const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness)  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
