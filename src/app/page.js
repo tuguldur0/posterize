@@ -1,54 +1,133 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Home() {
   const [imageSrc, setImageSrc] = useState(null);
-  const [algorithmSelected, setAlgorithmSelected] = useState("Floyd-Steinberg");
-  const algorithms = ["Bayer 4x4", "Floyd-Steinberg"];
-
+  const [algorithmSelected, setAlgorithmSelected] = useState("Original");
+  const [paletteSelected, setPaletteSelected] = useState("Green");
+  const [dependentBackground, setDependentBackground] = useState("[#DCE4F3]");
+  const [dependentTextColor, setDependentTextColor] = useState("[#0F380F]");
+  // ene deer original nemsen
+  const algorithms = ["Bayer 4x4", "Floyd-Steinberg", "Atkinson", "Original"];
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
+  const palettes = {
+    Green: [
+      [15, 56, 15],
+      [48, 98, 48],
+      [139, 172, 15],
+      [155, 188, 15],
+    ],
+    Gray: [
+      [25, 25, 25],
+      [105, 105, 105],
+      [175, 175, 175],
+      [235, 235, 235],
+    ],
+    Neon: [
+      [13, 2, 33],
+      [121, 26, 204],
+      [255, 56, 100],
+      [45, 226, 230],
+    ],
+    Brown: [
+      [68, 36, 12],
+      [137, 90, 48],
+      [202, 156, 110],
+      [242, 223, 198],
+    ],
+    Red: [
+      [15, 0, 0],
+      [115, 0, 0],
+      [225, 0, 0],
+      [255, 140, 140],
+    ],
+  };
 
-  const pallete = [
-    [15, 56, 15],
-    [48, 98, 48],
-    [139, 172, 15],
-    [155, 188, 15],
-  ]
+  //dependent backgroundcolor
+  const changeBackground = () => {
+    if (algorithmSelected === "Original") {
+      setDependentBackground("[#DCE4F3]");
+    }
+    if (algorithmSelected != "Original") {
+      if (paletteSelected === "Green") {
+        setDependentBackground("[#8BAC0F]");
+      }
+      if (paletteSelected === "Gray") {
+        setDependentBackground("[#343434]");
+      }
+      if (paletteSelected === "Neon") {
+        setDependentBackground("[#ff3864]");
+      }
+      if (paletteSelected === "Brown") {
+        setDependentBackground("[#895a30]");
+      }
+      if (paletteSelected === "Red") {
+        setDependentBackground("[#700000]");
+      }
+    }
+  };
+  const changeTextColor = () => {
+    if (algorithmSelected === "Original") {
+      setDependentTextColor("blue-700");
+    }
+    if (algorithmSelected != "Original") {
+      if (paletteSelected === "Green") {
+        setDependentTextColor("[#0F380F]");
+      }
+      if (paletteSelected === "Gray") {
+        setDependentTextColor("gray-400");
+      }
+      if (paletteSelected === "Neon") {
+        setDependentTextColor("cyan-500");
+      }
+      if (paletteSelected === "Brown") {
+        setDependentTextColor("gray-300");
+      }
+      if (paletteSelected === "Red") {
+        setDependentTextColor("[#ff3864]");
+      }
+    }
+  };
+  useEffect(() => {
+    changeBackground();
+    changeTextColor();
+  }, [paletteSelected, algorithmSelected]);
 
   const findClosestColor = (r, g, b, pallete) => {
     let minDistance = Infinity;
     let closestColor = pallete[0];
 
-    for(let i = 0; i < pallete.length; i++) {
+    for (let i = 0; i < pallete.length; i++) {
       const [pr, pg, pb] = pallete[i];
-      const distance = (r-pr) ** 2 + (g-pg) ** 2 + (b-pb) ** 2;
+      const distance = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2;
 
-      if(distance < minDistance) {
+      if (distance < minDistance) {
         minDistance = distance;
         closestColor = pallete[i];
       }
     }
     return closestColor;
   };
+
   const floydsteinberg = (data, width, height, pallete) => {
     const calculateError = (nx, ny, errR, errG, errB, factor) => {
-      if(nx >= 0 && nx < width && ny >= 0 && ny < height) {
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
         let nIdx = (ny * width + nx) * 4;
-        data[nIdx] += errR *factor
+        data[nIdx] += errR * factor;
         data[nIdx + 1] += errG * factor;
         data[nIdx + 2] += errB * factor;
       }
-    }
-    for(let y = 0; y < height; y++){
-      for(let x = 0; x < width; x++){
+    };
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         let index = (y * width + x) * 4;
-        
+
         let oldR = data[index];
         let oldG = data[index + 1];
         let oldB = data[index + 2];
-        
+
         const [newR, newG, newB] = findClosestColor(oldR, oldG, oldB, pallete);
 
         data[index] = newR;
@@ -58,95 +137,242 @@ export default function Home() {
         let errR = oldR - newR;
         let errG = oldG - newG;
         let errB = oldB - newB;
-        
-        calculateError(x+1, y, errR, errG, errB, 7/16);
-        calculateError(x-1, y+1, errR, errG, errB, 3/16);
-        calculateError(x, y+1, errR, errG, errB, 5/16);
-        calculateError(x+1, y+1, errR, errG, errB, 1/16);
+
+        calculateError(x + 1, y, errR, errG, errB, 7 / 16);
+        calculateError(x - 1, y + 1, errR, errG, errB, 3 / 16);
+        calculateError(x, y + 1, errR, errG, errB, 5 / 16);
+        calculateError(x + 1, y + 1, errR, errG, errB, 1 / 16);
       }
     }
-  }
+  };
 
-  
-  const drawCanvas = (img, algorithm) => {
+  const bayer4x4 = (data, width, height, pallete) => {
+    const bayer4x4 = [
+      [0, 8, 2, 10],
+      [12, 4, 14, 6],
+      [3, 11, 1, 9],
+      [15, 7, 13, 5],
+    ];
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let index = (y * width + x) * 4;
+
+        const matrix = bayer4x4[y % 4][x % 4];
+        const num = (matrix / 16 - 0.5) * 64;
+
+        let r = Math.min(255, Math.max(0, data[index] + num));
+        let g = Math.min(255, Math.max(0, data[index + 1] + num));
+        let b = Math.min(255, Math.max(0, data[index + 2] + num));
+
+        const [newR, newG, newB] = findClosestColor(r, g, b, pallete);
+
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
+      }
+    }
+  };
+
+  const atkinson = (data, width, height, pallete) => {
+    const calculateError = (nx, ny, errR, errG, errB, factor) => {
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+        let nIdx = (ny * width + nx) * 4;
+        data[nIdx] += errR * factor;
+        data[nIdx + 1] += errG * factor;
+        data[nIdx + 2] += errB * factor;
+      }
+    };
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        let index = (y * width + x) * 4;
+
+        let oldR = data[index];
+        let oldG = data[index + 1];
+        let oldB = data[index + 2];
+
+        const [newR, newG, newB] = findClosestColor(oldR, oldG, oldB, pallete);
+
+        data[index] = newR;
+        data[index + 1] = newG;
+        data[index + 2] = newB;
+
+        let errR = oldR - newR;
+        let errG = oldG - newG;
+        let errB = oldB - newB;
+
+        calculateError(x + 1, y, errR, errG, errB, 1 / 8);
+        calculateError(x + 2, y, errR, errG, errB, 1 / 8);
+        calculateError(x - 1, y + 1, errR, errG, errB, 1 / 8);
+        calculateError(x, y + 1, errR, errG, errB, 1 / 8);
+        calculateError(x + 1, y + 1, errR, errG, errB, 1 / 8);
+        calculateError(x, y + 2, errR, errG, errB, 1 / 8);
+      }
+    }
+  };
+  const scanlines = (height, width, data, interval = 2, darkness = 0.5) => {
+    //will make interval and darkness changable after frontend
+    for (let y = 0; y < height; y++) {
+      if (y % interval) {
+        for (let x = 0; x < width; x++) {
+          let index = (y * width + x) * 4;
+          data[index] *= darkness;
+          data[index + 1] *= darkness; // g
+          data[index + 2] *= darkness; // b
+        }
+      }
+    }
+  };
+
+  const drawCanvas = (img, algorithm, selectedPalette) => {
     const canvas = canvasRef.current;
-    if(!canvas) return;
-
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
     let width = img.width;
     let height = img.height;
     canvas.width = width;
     canvas.height = height;
-
     ctx.drawImage(img, 0, 0);
-
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     console.log(data); //look
-
-    if(algorithm == "Floyd-Steinberg"){
-      floydsteinberg(data, width, height, pallete);
+    const activePalette = palettes[selectedPalette];
+    if (algorithm == "Floyd-Steinberg") {
+      floydsteinberg(data, width, height, activePalette);
+      scanlines(height, width, data);
+    } else if (algorithm == "Bayer 4x4") {
+      bayer4x4(data, width, height, activePalette);
+    } else if (algorithm == "Atkinson") {
+      atkinson(data, width, height, activePalette);
     }
     ctx.putImageData(imageData, 0, 0);
-  }
-
+  };
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
-    if(!file) return;
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected);
+        drawCanvas(img, algorithmSelected, paletteSelected);
         setImageSrc(e.target.result);
-      }
+      };
       img.src = e.target.result;
-    }
-    reader.readAsDataURL(file)
-  }
+    };
+    reader.readAsDataURL(file);
+  };
   const handleAlgorithmChange = (event) => {
     const value = event.target.value;
     setAlgorithmSelected(value);
-    if(loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, value);
+    if (loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, value, paletteSelected);
     }
-  }
+  };
+  // unguu solidog function
+  const handlePaletteChange = (event) => {
+    const value = event.target.value;
+    setPaletteSelected(value);
+    if (loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, algorithmSelected, value);
+    }
+  };
   const handleExport = () => {
     const canvas = canvasRef.current;
-    if(!canvas) return;
-
+    if (!canvas) return;
     const link = document.createElement("a");
     link.download = "export.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
-  }
+  };
+  // reset buttonii function
+  const handleReset = () => {
+    setAlgorithmSelected("Original");
+    if (loadedImgRef.current) {
+      drawCanvas(loadedImgRef.current, "Original", paletteSelected);
+    }
+  };
   return (
-    <div className={algorithmSelected === "Floyd-Steinberg" ? `bg-[#8BAC0F]` : `bg-amber-700`}>
-      <h1>Posterize</h1>
+    <div
+      className={`bg-${dependentBackground} text-${dependentTextColor} w-screen min-h-screen transition-all duration-100`}
+    >
+      <div className="flex justify-center">
+        <h1 className="font-mono font-bold text-5xl p-5">Posterizer</h1>
+      </div>
+      <div className="flex justify-center">
+        <div className={`bg-gray-400 w-5xl h-2/4 m-5 box-border`}>
+          <canvas className={`w-5xl`} ref={canvasRef}></canvas>
+        </div>
+        <div className=" flex border-4 pt-5 flex-col p-3 gap-2.5 text-2xl m-5 justify-between">
+          <div className="flex flex-col gap-5">
+            <div>
+              <label className="flex flex-col gap-2">
+                Image{" "}
+                <input
+                  className={`border-2`}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              </label>
+            </div>
+            <div>
+              <label className="flex flex-col gap-2">
+                Algorithm:{" "}
+                <select
+                  className={` border-2 bg-${dependentBackground} text-${dependentTextColor}`}
+                  value={algorithmSelected}
+                  onChange={handleAlgorithmChange}
+                >
+                  {algorithms.map((option, index) => (
+                    <option value={option} key={index}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div>
+              {algorithmSelected != "Original" && (
+                <label className="flex flex-col gap-2">
+                  Palette:{" "}
+                  <select
+                    className={` border-2 bg-${dependentBackground} text-${dependentTextColor} `}
+                    value={paletteSelected}
+                    onChange={handlePaletteChange}
+                  >
+                    {Object.keys(palettes).map((key, index) => (
+                      <option className="border-8" value={key} key={index}>
+                        {key}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          </div>
 
-      <div>
-        <label>
-          Select image:{" "}
-          <input type="file" accept="image/*" onChange={handleImageUpload} />
-        </label>
+          <div className="flex flex-col text-4xl gap-5">
+            {imageSrc && (
+              <button
+                className="border-4 hover:cursor-pointer"
+                onClick={handleReset}
+              >
+                Reset
+              </button>
+            )}
+            {imageSrc && (
+              <button
+                className="border-4 hover:cursor-pointer"
+                onClick={handleExport}
+              >
+                Export
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-      <div>
-        <label>
-          Algorithm:{" "}
-          <select value={algorithmSelected} onChange={handleAlgorithmChange}>
-            {algorithms.map((option, index) => (
-              <option value={option} key={index}>{option}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div>
-        <canvas ref={canvasRef}></canvas>
-      </div>
-
-      {imageSrc && <button onClick={handleExport}>export</button>}
     </div>
-  )
+  );
 }
