@@ -8,6 +8,8 @@ export default function Home() {
   const [paletteSelected, setPaletteSelected] = useState("Green");
   const [scanlineInterval, setScanlineInterval] = useState(2);
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
+  const [chromaticSlider, setChromaticSlider] = useState(4);
+  const [noiseAmplitude, setNoiseAmplitude] = useState(40);
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Noise", "Original"];
   const [effects, setEffects] = useState({
@@ -226,7 +228,16 @@ export default function Home() {
       }
     }
   }
-  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness, activeEffects = effects)  => {
+  const drawCanvas = (
+    img,
+     algorithm, 
+     selectedPalette, 
+     interval = scanlineInterval, 
+     darkness = scanlineDarkness, 
+     activeEffects = effects,
+     movement = chromaticSlider,
+     amplitude = noiseAmplitude,
+    )  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -237,7 +248,6 @@ export default function Home() {
     ctx.drawImage(img, 0, 0);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    console.log(data); //look
     const activePalette = palettes[selectedPalette];
     if(algorithm == "Floyd-Steinberg"){
       floydsteinberg(data, width, height, activePalette);
@@ -246,12 +256,12 @@ export default function Home() {
     } else if (algorithm == "Atkinson"){
       atkinson(data, width, height, activePalette);
     } else if (algorithm == "Noise"){
-      noise(data, width, height, activePalette)
+      noise(data, width, height, activePalette, amplitude)
     }
     if(activeEffects.scanlines){
       scanlines(height, width, data, interval, darkness);
     }
-    if(activeEffects.chromaticAberration) chromaticAberration(height, width, data)
+    if(activeEffects.chromaticAberration) chromaticAberration(height, width, data, movement)
     ctx.putImageData(imageData, 0, 0);
   }
   const handleImageUpload = (event) => {
@@ -262,7 +272,7 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects);
+        drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider);
         setImageSrc(e.target.result);
       }
       img.src = e.target.result;
@@ -356,6 +366,30 @@ export default function Home() {
             if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, val);
 
           }} />
+        </label>
+      </div>
+      <div>
+        <label>
+          Chromatic Aberration Shift: {chromaticSlider}
+          <input type="range" min="1" max="20" step="1" value={chromaticSlider} onChange={(e) => {setChromaticSlider(Number(e.target.value))}} onMouseUp={(e) => {
+            const val = Number(e.target.value);
+            if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, val, noiseAmplitude);
+
+          }}/>
+        </label>
+      </div>
+      <div>
+        <label>
+          noise amplitude: {noiseAmplitude}
+          <input type="range" min="0" max="100" step="1" value={noiseAmplitude} onChange={(e) => {
+            setNoiseAmplitude(Number(e.target.value));
+          }} onMouseUp={(e) => {
+            const val = Number(e.target.value);
+            if(loadedImgRef.current){
+              drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, val)
+
+            }
+          }}/>
         </label>
       </div>
       <div>
