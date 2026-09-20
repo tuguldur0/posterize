@@ -10,6 +10,10 @@ export default function Home() {
   const [scanlineDarkness, setScanlineDarkness] = useState(0.5);
   // ene deer original nemsen
   const algorithms = ["Bayer 4x4", "Floyd-Steinberg","Atkinson", "Noise", "Original"];
+  const [effects, setEffects] = useState({
+    scanlines: false,
+    chromaticAberration: false,
+  });
   const canvasRef = useRef(null);
   const loadedImgRef = useRef(null);
   const palettes = {
@@ -188,7 +192,7 @@ export default function Home() {
   //effects
   const scanlines = (height, width, data, interval = 2, darkness = 0.5) => { //will make interval and darkness changable after frontend
     for(let y = 0; y < height; y++){
-      if(y % interval) {
+      if(y % interval === 0) {
         for(let x=0; x <width; x++ ){
           let index = (y * width + x) * 4;
           data[index] *= darkness; 
@@ -222,7 +226,7 @@ export default function Home() {
       }
     }
   }
-  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness)  => {
+  const drawCanvas = (img, algorithm, selectedPalette, interval = scanlineInterval, darkness = scanlineDarkness, activeEffects = effects)  => {
     const canvas = canvasRef.current;
     if(!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -244,9 +248,10 @@ export default function Home() {
     } else if (algorithm == "Noise"){
       noise(data, width, height, activePalette)
     }
-    if (algorithm !== "Original") {
-      scanlines(height, width , data, interval, darkness);
+    if(activeEffects.scanlines){
+      scanlines(height, width, data, interval, darkness);
     }
+    if(activeEffects.chromaticAberration) chromaticAberration(height, width, data)
     ctx.putImageData(imageData, 0, 0);
   }
   const handleImageUpload = (event) => {
@@ -257,7 +262,7 @@ export default function Home() {
       const img = new Image();
       img.onload = () => {
         loadedImgRef.current = img;
-        drawCanvas(img, algorithmSelected, paletteSelected);
+        drawCanvas(img, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects);
         setImageSrc(e.target.result);
       }
       img.src = e.target.result;
@@ -268,7 +273,7 @@ export default function Home() {
     const value = event.target.value;
     setAlgorithmSelected(value);
     if(loadedImgRef.current) {
-      drawCanvas(loadedImgRef.current, value, paletteSelected);
+      drawCanvas(loadedImgRef.current, value, paletteSelected, scanlineInterval,scanlineDarkness, effects);
     }
   }
   // unguu solidog function
@@ -277,6 +282,13 @@ export default function Home() {
     setPaletteSelected(value);
     if (loadedImgRef.current) {
       drawCanvas(loadedImgRef.current, algorithmSelected, value);
+    }
+  }
+  const handleEffectToggle = (effectName) => {
+    const updated = {...effects, [effectName]: !effects[effectName]};
+    setEffects(updated);
+    if(loadedImgRef.current){
+      drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, updated)
     }
   }
   const handleExport = () => {
@@ -344,6 +356,18 @@ export default function Home() {
             if(loadedImgRef.current) drawCanvas(loadedImgRef.current, algorithmSelected, paletteSelected, scanlineInterval, val);
 
           }} />
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" checked={effects.scanlines} onChange={() => handleEffectToggle("scanlines")}/>
+          scanlines
+        </label>
+      </div>
+      <div>
+        <label>
+          <input type="checkbox" checked={effects.chromaticAberration} onChange={() => handleEffectToggle("chromaticAberration")}/>
+          Chromatic aberration
         </label>
       </div>
       <div>
