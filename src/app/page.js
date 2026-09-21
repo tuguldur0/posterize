@@ -90,7 +90,7 @@ export default function Home() {
   };
   useEffect(() => {
     const onKeyDown = (e) => {
-      if((e.metakey || e.ctrlKey) && e.key === "s"){
+      if((e.metaKey || e.ctrlKey) && e.key === "s"){
         e.preventDefault();
         if(imageSrc) handleExport();
       }
@@ -614,6 +614,65 @@ export default function Home() {
       data[i + 2] = 255 - data[i + 2];
     }
   };
+  const renderToCanvas = (
+    canvas, 
+    img,
+    algorithm,
+    selectedPalette, 
+    interval = scanlineInterval,
+    darkness = scanlineDarkness,
+    activeEffects = effects,
+    movement = chromaticSlider, 
+    amplitude = noiseAmplitude,
+    currentCustomColors = customColors,
+    brightnessVal = brightness, 
+    contrastVal = contrast,
+    gammaVal = gamma,
+    levelsVal = levels,
+    blockSize = pixelSize,
+    maxSize = 1200,
+  ) => {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    let width = img.width;
+    let height= img.height;
+    if(width > maxSize || height > maxSize) {
+      const ratio = Math.min(maxSize / width, maxSize / height)
+      width = Math.floor(width * ratio)
+      height = Math.floor(height * ratio)
+    }
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(img, 0, 0, width, height);
+    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const activePalette = selectedPalette = "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
+    if(activeEffects.invert) invert(data);
+
+    if(algorithm == "Bayer 2x2"){
+      bayer2x2(data, width, height, activePalette)
+    } else if(algorithm == "Bayer 4x4"){
+      bayer4x4(data, width, height, activePalette)
+    } else if(algorithm == "Bayer 8x8"){
+      bayer8x8(data, width, height, activePalette)
+    } else if (algorithm == "Atkinson") {
+      atkinson(data, width, height, activePalette);
+    } else if (algorithm == "Floyd-Steinberg") {
+      floydsteinberg(data, width, height, activePalette);
+    } else if (algorithm == "Halftone") {
+      halftone(data, width, height, activePalette);
+    } else if (algorithm == "Noise") {
+      noise(data, width, height, activePalette);
+    }
+
+    if(activeEffects.scanlines){
+      scanlines(height, width, data, interval, darkness);
+    }
+    if(activeEffects.chromaticAberration) {
+      chromaticAberration(height, width, data, movement);
+    }
+    ctx.putImageData(imageData, 0, 0);
+  };
   const drawCanvas = (
     img,
     algorithm,
@@ -626,55 +685,13 @@ export default function Home() {
     currentCustomColors = customColors,
     brightnessVal = brightness,
     contrastVal = contrast,
-    gammaVal = gamma, 
+    gammaVal = gamma,
     levelsVal = levels,
     blockSize = pixelSize,
   ) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    let width = img.width;
-    let height = img.height;
-    const MAX_Size = 1200;
-    if(width > MAX_Size || height > MAX_Size) {
-      const ratio = Math.min(MAX_Size / width, MAX_Size / height)
-      width = Math.floor(width*ratio);
-      height = Math.floor(height * ratio);
-    }
-    canvas.width = width;
-    canvas.height = height;
-    ctx.drawImage(img, 0, 0, width, height);
-    let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    const activePalette = selectedPalette === "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
-    if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
-    adjustColor(data, brightnessVal, contrastVal, gammaVal);
-    posterizeLevels(data, levelsVal)
-    if (activeEffects.invert) invert(data);
+    renderToCanvas(canvasRef.current, img, algorithm, selectedPalette, interval, darkness, activeEffects, movement, amplitude, currentCustomColors, brightnessVal, contrastVal, gammaVal, levelsVal, blockSize, 1200)
 
-    if (algorithm == "Floyd-Steinberg") {
-      floydsteinberg(data, width, height, activePalette);
-    } else if (algorithm == "Bayer 2x2"){
-      bayer2x2(data, width, height, activePalette);
-    } else if (algorithm == "Bayer 4x4") {
-      bayer4x4(data, width, height, activePalette);
-    } else if (algorithm == "Atkinson") {
-      atkinson(data, width, height, activePalette);
-    } else if (algorithm == "Noise") {
-      noise(data, width, height, activePalette, amplitude);
-    } else if (algorithm == "Bayer 8x8"){
-      bayer8x8(data, width, height, activePalette);
-    } else if (algorithm == "Halftone"){
-      halftone(data, width, height, activePalette, blockSize);
-    }
-    if (activeEffects.scanlines) {
-      scanlines(height, width, data, interval, darkness);
-    }
-    if (activeEffects.chromaticAberration) {
-      chromaticAberration(height, width, data, movement);
-    }
-    ctx.putImageData(imageData, 0, 0);
-  };
+  }
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
