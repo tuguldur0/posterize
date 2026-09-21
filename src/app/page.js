@@ -29,6 +29,8 @@ export default function Home() {
   const [splitPos, setSplitPos] = useState(50);
   const [history, setHistory] = useState([]);
   const [future, setFuture] = useState([]);
+  const [levels, setLevels] = useState(8);
+  const [zoom, setZoom] = useState(1);
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 2x2",
@@ -88,14 +90,22 @@ export default function Home() {
   };
   useEffect(() => {
     const onKeyDown = (e) => {
-      if((e.metaKey || e.ctrlKey) && e.key === "s"){
+      if((e.metakey || e.ctrlKey) && e.key === "s"){
         e.preventDefault();
         if(imageSrc) handleExport();
+      }
+      if((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z"){
+        e.preventDefault();
+        if(e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [imageSrc]);
+  }, [imageSrc, history, future]);
   useEffect(() => {
     const onPaste = (e) => {
       const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"))
@@ -157,7 +167,7 @@ export default function Home() {
   const handleRedo = () => {
     if(future.length == 0) return;
     const next = future[0];
-    setHistory((h) => [...h, currentSettings]);
+    setHistory((h) => [...h, currentSettings()]);
     setFuture((f) => f.slice(1));
     applySettings(next);
   }
@@ -617,7 +627,7 @@ export default function Home() {
     brightnessVal = brightness,
     contrastVal = contrast,
     gammaVal = gamma, 
-    levelsVal = 8,
+    levelsVal = levels,
     blockSize = pixelSize,
   ) => {
     const canvas = canvasRef.current;
@@ -764,6 +774,7 @@ export default function Home() {
   };
   // reset buttonii function
   const handleReset = () => {
+    pushHistory();
     const defaults = {
       algorithm: "Original",
       palette: "Green",
@@ -781,6 +792,7 @@ export default function Home() {
         invert: false,
         pixelate: false,
       },
+      levels: 8,
     }
     setAlgorithmSelected(defaults.algorithm);
     setPaletteSelected(defaults.palette);
@@ -793,6 +805,8 @@ export default function Home() {
     setGamma(defaults.gammaVal);
     setPixelSize(defaults.blockSize);
     setEffects(defaults.effects);
+    setLevels(defaults.levels);
+    setZoom(1)
     if(loadedImgRef.current) {
       drawCanvas(
         loadedImgRef.current,
@@ -807,7 +821,7 @@ export default function Home() {
         defaults.brightnessVal,
         defaults.contrastVal,
         defaults.gammaVal,
-        8,
+        defaults.levels,
         defaults.blockSize,
       )
 
@@ -815,6 +829,7 @@ export default function Home() {
   };
   const handleRandomizer = () => {
     if (!loadedImgRef.current) return;
+    pushHistory();
     const randomAlgo = algorithms[Math.floor(Math.random() * algorithms.length)];
     const paletteKeys = Object.keys(palettes);
     const randomPalette = paletteKeys[Math.floor(Math.random() * paletteKeys.length)];
@@ -867,10 +882,19 @@ export default function Home() {
         <div className="p-8">
            <h1 className="p-10 font-bold text-5xl">Posterize</h1>
         </div>
-      <div className="p-8 flex items-center justify-center p-8 flex-1">
+        <div className="p-8 flex items-center justify-center flex-1 overflow-auto"
+          onWheel={(e) => {
+            if(!imageSrc) return;
+            e.preventDefault();
+            setZoom((z) => {
+              const next = z - e.deltaY * 0.001;
+              return Math.min(4, Math.max(0.25, Number(next.toFixed(2))));
+            })
+          }}>
         <div className="relative bg-gray-400 p-2 shadow-lg inline-block box-border select-none overflow-hidden"
+        style={{transform: `scale(${zoom})`, transformOrigin: "center center"}}
         onMouseMove={(e) => {
-          if (!isSplitView) return;
+          if(!isSplitView) return;
           const rect = e.currentTarget.getBoundingClientRect();
           const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
           setSplitPos((x / rect.width) * 100);
@@ -1194,6 +1218,26 @@ export default function Home() {
               />
             </label>
           </div>
+          <div>
+            <label className="flex flex-col">
+              Zoom: {Math.round(zoom * 100)}%
+              <input 
+              className={`${dependentAccentColor}`}
+              type="range"
+              min="0.25"
+              max="4"
+              step="0.05"
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              />
+            </label>
+            <button 
+              type="button"
+              className="text-sm underline self-start mt-1"
+              onClick={() => setZoom(1)}>
+              reset zoom
+            </button>
+          </div>
           
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
@@ -1211,6 +1255,18 @@ export default function Home() {
               onClick={() => setIsSplitView(!isSplitView)}>
                 {isSplitView ? "Exit Split View" : "Split view"}
               </button>
+            )}
+            {imageSrc && (
+              <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+              onClick={handleUndo}
+              disabled={history.length === 0}
+              >Undo</button>
+            )}
+            {imageSrc && (
+              <button 
+                className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+                onClick={handleRedo}
+                disabled={future.length == 0}>Redo</button>
             )}
             {imageSrc && (
               <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
@@ -1232,17 +1288,19 @@ export default function Home() {
                 Export
               </button>
             )}
-            <button>
-              <label>
-                Load preset
-                <input 
-                type="file"
-                accept="application/json"
-                onChange={handleLoadPreset}
-                className="hidden"
-                />
+            {imageSrc && (
+              <button
+              className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
+              onClick={handleSavePreset}>
+                Save Preset
+              </button>
+            )}
+            {imageSrc && (
+              <label className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover-300 hover:p-2 text-center`}>
+                Load Preset
+                <input type="file" accept="application/json" onChange={handleLoadPreset} className="hidden" />
               </label>
-            </button>
+            )}
           </div>
         </div>
       </div>
