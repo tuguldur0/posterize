@@ -31,6 +31,10 @@ export default function Home() {
   const [future, setFuture] = useState([]);
   const [levels, setLevels] = useState(8);
   const [zoom, setZoom] = useState(1);
+  const [exportFormat, setExportFormat] = useState("png");
+  const [exportQuality, setExportQuality] = useState(0.92);
+  const viewportRef = useRef(null);
+  const [pickedColor, setPickedColor] = useState(null);
   // ene deer original nemsen.
   const algorithms = [
     "Bayer 2x2",
@@ -88,6 +92,53 @@ export default function Home() {
       [140, 140, 255],
     ],
   };
+  const presets = {
+    GameBoy: { 
+      algorithm: "Bayer 4x4",
+      palette: "Green",
+      effects: {
+        scanlines: false,
+        chromaticAberration: false,
+        invert: false,
+        pixelate: false,
+      },
+      brightness: 0,
+      contrast: 20,
+      gamma: 1,
+      levels: 4,
+      pixelSize: 8
+    },
+    vhs: { 
+      algorithm: "Floyd-Steinberg",
+      palette: "Neon",
+      effects: {
+        scanlines: true,
+        chromaticAberration: true,
+        invert: false,
+        pixelate: false,
+      },
+      brightness: 5,
+      contrast: 10,
+      gamma: 1,
+      levels: 8,
+      pixelSize: 8
+    },
+    "Halftone Print": {
+      algorithm: "Halftone",
+      palette: "Gray",
+      effects: {
+        scanlines: false,
+        chromaticAberration: false,
+        invert: false,
+        pixelate: false
+      },
+      brightness: 0,
+      contrast: 15, 
+      gamma: 1,
+      levels: 8,
+      pixelSize: 8
+    },
+  }
   useEffect(() => {
     const onKeyDown = (e) => {
       if((e.metaKey || e.ctrlKey) && e.key === "s"){
@@ -106,6 +157,7 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [imageSrc, history, future]);
+
   useEffect(() => {
     const onPaste = (e) => {
       const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"))
@@ -126,12 +178,27 @@ export default function Home() {
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
   }, [algorithmSelected, paletteSelected, scanlineInterval, scanlineDarkness, effects, chromaticSlider, noiseAmplitude, customColors, brightness, contrast, gamma, levels, pixelSize]);
+  
   const hexToRgb = (hex) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return [r, g, b];
   };
+  const applyPreset = (name) => {
+    const p = presets[name];
+    if(!p || !loadedImgRef.current) return;
+    pushHistory();
+    setAlgorithmSelected(p.algorithm);
+    setPaletteSelected(p.palette);
+    setEffects(p.effects);
+    setBrightness(p.brightness);
+    setContrast(p.contrast);
+    setGamma(p.gamma);
+    setLevels(p.levels);
+    setPixelSize(p.pixelSize);
+    drawCanvas(loadedImgRef.current, p.algorithm, p.palette, scanlineInterval, scanlineDarkness, p.effects, chromaticSlider, noiseAmplitude, customColors, p.brightness, p.contrast, p.gamma, p.levels, p.pixelSize);
+  }
   const currentSettings = () => ({
     algorithmSelected, paletteSelected, effects, brightness, contrast, gamma, pixelSize, levels, scanlineInterval, scanlineDarkness, chromaticSlider, noiseAmplitude, customColors,
   })
@@ -646,8 +713,12 @@ export default function Home() {
     ctx.drawImage(img, 0, 0, width, height);
     let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
-    const activePalette = selectedPalette = "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
+    const activePalette = selectedPalette == "Custom" ? currentCustomColors.map(color => hexToRgb(color)) : palettes[selectedPalette];
+    if(activeEffects.pixelate) pixelate(data, width, height, blockSize);
+    adjustColor(data, brightnessVal, contrastVal, gammaVal);
+    posterizeLevels(data, levelsVal);
     if(activeEffects.invert) invert(data);
+
 
     if(algorithm == "Bayer 2x2"){
       bayer2x2(data, width, height, activePalette)
@@ -660,9 +731,9 @@ export default function Home() {
     } else if (algorithm == "Floyd-Steinberg") {
       floydsteinberg(data, width, height, activePalette);
     } else if (algorithm == "Halftone") {
-      halftone(data, width, height, activePalette);
+      halftone(data, width, height, activePalette, blockSize);
     } else if (algorithm == "Noise") {
-      noise(data, width, height, activePalette);
+      noise(data, width, height, activePalette, amplitude);
     }
 
     if(activeEffects.scanlines){
@@ -711,6 +782,7 @@ export default function Home() {
           noiseAmplitude
         );
         setImageSrc(e.target.result);
+        requestAnimationFrame(() => handleFitToScreen());
       };
       img.src = e.target.result;
     }
@@ -778,16 +850,36 @@ export default function Home() {
     }
   };
   const handleExport = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    confetti({particleCount: 100, 
+    if(!loadedImgRef.current) return;
+    const exportCanvas = document.createElement("canvas");
+    renderToCanvas(
+      exportCanvas,
+      loadedImgRef.current,
+      algorithmSelected,
+      paletteSelected,
+      scanlineInterval,
+      scanlineDarkness,
+      effects,
+      chromaticSlider,
+      noiseAmplitude,
+      customColors,
+      brightness,
+      contrast,
+      gamma, 
+      levels,
+      pixelSize,
+      Infinity,
+    );
+    confetti({particleCount: 100,
       spread: 70,
-       origin: { y: 0.6}
+      origin: {y: 0}
     });
+    const mime = exportFormat == "jpeg" ? "image/jpeg" : "image/png";
+    const ext = exportFormat == "jpeg" ? "jpg" : "png";
     const link = document.createElement("a");
-    link.download = "export.png";
-    link.href = canvas.toDataURL("image/png");
-    link.click();
+    link.download = `export.${ext}`
+    link.href = exportCanvas.toDataURL(mime, exportFormat == "jpeg" ? exportQuality : undefined)
+    link.click()
   };
   // reset buttonii function
   const handleReset = () => {
@@ -844,6 +936,33 @@ export default function Home() {
 
     }
   };
+  const handleFitToScreen = () => {
+    const canvas = canvasRef.current;
+    const viewport = viewportRef.current;
+    if(!canvas || !viewport) return;
+    const padding = 64; 
+    const availW = viewport.clientWidth - padding;
+    const availH = viewport.clientHeight - padding;
+    const fit = Math.min(availW / canvas.width, availH / canvas.height, 4);
+    setZoom(Math.max(0.25, Number(fit.toFixed(2))));
+  }
+
+  const rgbToHex= (r, g, b) => {
+    return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+  }
+  const handleCanvasClick = (e) => {
+    const canvas = canvasRef.current;
+    if(!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    const ctx = canvas.getContext("2d");
+    const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+    setPickedColor({r, g, b, hex: rgbTohex(r, g, b)})
+  }
+
   const handleRandomizer = () => {
     if (!loadedImgRef.current) return;
     pushHistory();
@@ -899,7 +1018,7 @@ export default function Home() {
         <div className="p-8">
            <h1 className="p-10 font-bold text-5xl">Posterize</h1>
         </div>
-        <div className="p-8 flex items-center justify-center flex-1 overflow-auto"
+        <div ref={viewportRef} className="p-8 flex items-center justify-center flex-1 overflow-auto"
           onWheel={(e) => {
             if(!imageSrc) return;
             e.preventDefault();
@@ -916,7 +1035,7 @@ export default function Home() {
           const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
           setSplitPos((x / rect.width) * 100);
         }}>
-        <canvas className="block max-w-full h-auto" ref={canvasRef}></canvas>
+        <canvas onClick={handleCanvasClick} className="block max-w-full h-auto" ref={canvasRef}></canvas>
         {imageSrc && canvasRef.current && (
           <div className="absolute bottom-4 right-4 bg-black text-white text-xs px-2 py-2 opacity-80 pointer-events-none rounded shadow">
             {canvasRef.current.width} x {canvasRef.current.height}px
@@ -1254,8 +1373,38 @@ export default function Home() {
               onClick={() => setZoom(1)}>
               reset zoom
             </button>
+            <button 
+              type="button"
+              className="text-sm underline self-start mt-1"
+              onClick={handleFitToScreen}>
+              fit to screen
+            </button>
           </div>
-          
+          <div>
+            <label className="flex flex-col">
+              export format:{" "}
+              <select 
+                className={`${dependentBackground} ${dependentTextColor} border-2 p-1`}
+                value={exportFormat}
+                onChange={(e) => setExportFormat(e.target.value)}>
+                <option value="png">PNG</option>
+                <option value="jpeg">JPEG</option>
+              </select>
+            </label>
+            {exportFormat === "jpeg" && (
+              <label className="flex flex-col mt-2">
+                Quality: {Math.round(exportQuality * 100)}%
+                <input className={`${dependentAccentColor}`}
+                type="range"
+                min="0.1"
+                max="1"
+                step="0.05"
+                value={exportQuality}
+                onChange={(e) => setExportQuality(Number(e.target.value))}></input>
+              </label>
+            )}
+          </div>
+        
           <div className="flex flex-col text-4xl gap-5">
             {imageSrc && (
               <button
@@ -1288,6 +1437,16 @@ export default function Home() {
             {imageSrc && (
               <button className={`border-4 hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300 hover:p-2`}
               onClick={handleRandomizer}>Random</button>
+            )}
+            {imageSrc && (
+              <div className="flex gap-2">
+                {Object.keys(presets).map((name) => (
+                  <button key={name} onClick={() => applyPreset(name)}
+                  className={`border-4 py-1 px-2 text-lg hover:cursor-pointer ${swappedBackground} ${swappedTextColor} transition-all duration-300`}>
+                    {name}
+                  </button>
+                ))}
+              </div>
             )}
             {imageSrc && (
               <button
